@@ -171,10 +171,138 @@ def show_recipe(recipe: dict, matched: list, missing: list) -> None:
             f'<div class="shopping-list-title">🛔 Still need</div>{items}</div>',
             unsafe_allow_html=True,
         )
+        # Scoped style for the add-to-list button
+        safe_modal_key = (
+            f"modal_shop_{recipe['name']}"
+            .replace(" ", "-").replace("'", "").replace(",", "").replace("(", "").replace(")", "")
+        )
+        st.markdown(
+            f"""
+            <style>
+            .st-key-{safe_modal_key} button {{
+                background: linear-gradient(135deg, #00B894, #00CEC9) !important;
+                color: #FFFFFF !important;
+                border: none !important;
+                border-radius: 12px !important;
+                padding: 0.65rem 1.25rem !important;
+                font-weight: 700 !important;
+                font-size: 0.9rem !important;
+                letter-spacing: 0.02em !important;
+                box-shadow: 0 4px 14px rgba(0,184,148,0.35) !important;
+                transition: box-shadow 0.15s ease, transform 0.1s ease !important;
+                margin-top: 0.5rem !important;
+            }}
+            .st-key-{safe_modal_key} button:hover {{
+                box-shadow: 0 6px 20px rgba(0,184,148,0.5) !important;
+                transform: translateY(-2px) !important;
+            }}
+            .st-key-{safe_modal_key} button:active {{
+                transform: translateY(0) !important;
+            }}
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button(
+            f"🛒\u2002Add {len(missing)} missing item{'s' if len(missing) != 1 else ''} to shopping list",
+            key=safe_modal_key,
+            use_container_width=True,
+        ):
+            existing = {i["item"].lower() for i in st.session_state.shopping_list}
+            for m in missing:
+                if m.lower() not in existing:
+                    st.session_state.shopping_list.append({"item": m, "checked": False, "source": recipe["name"]})
+            st.rerun()
     st.markdown(
         f'<div class="method-block">{recipe.get("method","No method provided.")}</div>',
         unsafe_allow_html=True,
     )
+
+
+@st.dialog("🛒 Add ingredients to list", width="large")
+def pick_ingredients(recipe: dict) -> None:
+    """Modal: all ingredients pre-selected as checkboxes; user deselects what they have."""
+    st.markdown(
+        f'<div class="modal-title" style="font-size:1.25rem;">{recipe["name"]}</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<p style='color:#888;font-size:0.83rem;margin:0.15rem 0 0.9rem;'>"
+        "Tick the ingredients you <b>don’t</b> already have, then hit Add."
+        "</p>",
+        unsafe_allow_html=True,
+    )
+
+    ingredients = recipe["ingredients"]
+    # Build checkbox state: default True (selected) for every ingredient
+    selections: dict[str, bool] = {}
+    cols = st.columns(2)
+    for idx, ing in enumerate(ingredients):
+        ck_key = f"pick_ing_{recipe['name']}_{idx}"
+        # Initialise to True on first render
+        if ck_key not in st.session_state:
+            st.session_state[ck_key] = True
+        with cols[idx % 2]:
+            selections[ing] = st.checkbox(ing, key=ck_key)
+
+    chosen = [ing for ing, sel in selections.items() if sel]
+    safe_confirm_key = (
+        f"pick_confirm_{recipe['name']}"
+        .replace(" ", "-").replace("'", "").replace(",", "").replace("(", "").replace(")", "")
+    )
+    st.markdown(
+        f"""
+        <style>
+        .st-key-{safe_confirm_key} button {{
+            background: linear-gradient(135deg, #00B894, #00CEC9) !important;
+            color: #FFFFFF !important;
+            border: none !important;
+            border-radius: 12px !important;
+            font-weight: 700 !important;
+            font-size: 0.9rem !important;
+            box-shadow: 0 4px 14px rgba(0,184,148,0.35) !important;
+            transition: box-shadow 0.15s ease, transform 0.1s ease !important;
+        }}
+        .st-key-{safe_confirm_key} button:hover {{
+            box-shadow: 0 6px 20px rgba(0,184,148,0.5) !important;
+            transform: translateY(-2px) !important;
+        }}
+        .st-key-{safe_confirm_key} button:disabled {{
+            opacity: 0.45 !important;
+            transform: none !important;
+            box-shadow: none !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("---")
+    col_btn, col_info = st.columns([3, 2])
+    with col_info:
+        st.markdown(
+            f"<p style='color:#888;font-size:0.82rem;margin-top:0.6rem;'>"
+            f"{len(chosen)} of {len(ingredients)} selected</p>",
+            unsafe_allow_html=True,
+        )
+    with col_btn:
+        if st.button(
+            f"🛒\u2002Add {len(chosen)} item{'s' if len(chosen) != 1 else ''} to shopping list",
+            key=safe_confirm_key,
+            disabled=len(chosen) == 0,
+            use_container_width=True,
+        ):
+            existing = {i["item"].lower() for i in st.session_state.shopping_list}
+            for ing in chosen:
+                if ing.lower() not in existing:
+                    st.session_state.shopping_list.append(
+                        {"item": ing, "checked": False, "source": recipe["name"]}
+                    )
+            # Clear checkbox state so next open starts fresh
+            for idx in range(len(ingredients)):
+                ck_key = f"pick_ing_{recipe['name']}_{idx}"
+                if ck_key in st.session_state:
+                    del st.session_state[ck_key]
+            st.rerun()
 
 
 def recipe_card(recipe: dict, matched: list, missing: list, pct: int, key_prefix: str) -> None:
@@ -253,6 +381,10 @@ if "pending_ingredient" not in st.session_state:
     # Holds (original_text, suggestion) while awaiting user confirmation
     st.session_state.pending_ingredient = None
 
+if "shopping_list" not in st.session_state:
+    # Each entry: {"item": str, "checked": bool}
+    st.session_state.shopping_list = []
+
 
 # ── App header ───────────────────────────────────────────────────────────────
 
@@ -263,7 +395,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-tab_search, tab_browse, tab_add = st.tabs(["Find Recipes", "Browse All", "Add Recipe"])
+tab_search, tab_browse, tab_add, tab_shop = st.tabs(["Find Recipes", "Browse All", "Add Recipe", "🛒 Shopping List"])
 
 
 # ── Tab 1: Search ─────────────────────────────────────────────────────────────
@@ -405,6 +537,16 @@ with tab_search:
             else:
                 for recipe, matched, missing, score, pct in nearly:
                     recipe_card(recipe, matched, missing, pct, "near")
+                    if st.button(
+                        "🛒 Add missing to list",
+                        key=f"shop_near_{recipe['name']}",
+                        use_container_width=True,
+                    ):
+                        existing = {i["item"].lower() for i in st.session_state.shopping_list}
+                        for m in missing:
+                            if m.lower() not in existing:
+                                st.session_state.shopping_list.append({"item": m, "checked": False, "source": recipe["name"]})
+                        st.rerun()
 
 
 # ── Tab 2: Browse ─────────────────────────────────────────────────────────────
@@ -481,14 +623,23 @@ with tab_browse:
                 col = col_left if idx % 2 == 0 else col_right
                 with col:
                     recipe_card(recipe, recipe["ingredients"], [], 0, "browse")
-                    if st.button("🗑 Delete", key=f"del_{recipe['name']}",
-                                 use_container_width=True):
-                        st.session_state.recipes = [
-                            r for r in st.session_state.recipes
-                            if r["name"] != recipe["name"]
-                        ]
-                        save_recipes(st.session_state.recipes)
-                        st.rerun()
+                    btn_col, del_col = st.columns([3, 1])
+                    with btn_col:
+                        if st.button(
+                            "🛒 Add ingredients to list",
+                            key=f"addlist_{recipe['name']}",
+                            use_container_width=True,
+                        ):
+                            pick_ingredients(recipe)
+                    with del_col:
+                        if st.button("🗑 Delete", key=f"del_{recipe['name']}",
+                                     use_container_width=True):
+                            st.session_state.recipes = [
+                                r for r in st.session_state.recipes
+                                if r["name"] != recipe["name"]
+                            ]
+                            save_recipes(st.session_state.recipes)
+                            st.rerun()
 
 
 # ── Tab 3: Add recipe ─────────────────────────────────────────────────────────
@@ -621,3 +772,90 @@ with tab_add:
                 save_recipes(st.session_state.recipes)
                 st.success(f"✅ '{name}' saved!")
                 st.rerun()
+
+
+# ── Tab 4: Shopping List ─────────────────────────────────────────────────────
+
+with tab_shop:
+    st.markdown('<div style="max-width:600px;margin:0 auto;">', unsafe_allow_html=True)
+
+    # ── Manual add ───────────────────────────────────────────────────────────
+    with st.form("shop_add_form", clear_on_submit=True):
+        col_si, col_sb = st.columns([8, 1])
+        with col_si:
+            new_shop_item = st.text_input(
+                "shop_input",
+                label_visibility="collapsed",
+                placeholder="Add an item…",
+            )
+        with col_sb:
+            shop_add = st.form_submit_button("Add", use_container_width=True)
+
+    if shop_add and new_shop_item.strip():
+        existing_items = {i["item"].lower() for i in st.session_state.shopping_list}
+        if new_shop_item.strip().lower() not in existing_items:
+            st.session_state.shopping_list.append({"item": new_shop_item.strip(), "checked": False})
+        st.rerun()
+
+    # ── The list ──────────────────────────────────────────────────────────────
+    sl = st.session_state.shopping_list
+    if not sl:
+        st.markdown(
+            '<div class="empty-state">Your shopping list is empty.<br>'
+            'Open a recipe and hit <b>🛒 Add missing to shopping list</b> to get started.</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        to_buy  = [i for i in sl if not i["checked"]]
+        in_cart = [i for i in sl if i["checked"]]
+
+        # Action bar
+        col_rm, col_cl = st.columns(2)
+        with col_rm:
+            if in_cart and st.button(
+                f"Remove ticked ({len(in_cart)})",
+                key="shop_rm_checked",
+                use_container_width=True,
+            ):
+                st.session_state.shopping_list = to_buy
+                st.rerun()
+        with col_cl:
+            if st.button("Clear all", key="shop_clear_all", use_container_width=True):
+                st.session_state.shopping_list = []
+                st.rerun()
+
+        # Rows helper
+        def _shop_rows(items: list[dict]) -> None:
+            for item_obj in items:
+                col_chk, col_del = st.columns([11, 1])
+                with col_chk:
+                    source = item_obj.get("source", "")
+                    label = f"{item_obj['item']}  ({source})" if source else item_obj["item"]
+                    ticked = st.checkbox(
+                        label,
+                        value=item_obj["checked"],
+                        key=f"shop_chk_{item_obj['item']}",
+                    )
+                    if ticked != item_obj["checked"]:
+                        item_obj["checked"] = ticked
+                        st.rerun()
+                with col_del:
+                    if st.button("✕", key=f"shop_del_{item_obj['item']}", help="Remove"):
+                        st.session_state.shopping_list.remove(item_obj)
+                        st.rerun()
+
+        if to_buy:
+            st.markdown(
+                f'<div class="shop-section-label">To buy &nbsp;<span class="count">{len(to_buy)}</span></div>',
+                unsafe_allow_html=True,
+            )
+            _shop_rows(to_buy)
+
+        if in_cart:
+            st.markdown(
+                f'<div class="shop-section-label done">In trolley &nbsp;<span class="count">{len(in_cart)}</span></div>',
+                unsafe_allow_html=True,
+            )
+            _shop_rows(in_cart)
+
+    st.markdown('</div>', unsafe_allow_html=True)

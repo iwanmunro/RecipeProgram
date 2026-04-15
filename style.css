@@ -197,6 +197,34 @@ html, body, [class*="css"] {
     vertical-align: middle;
 }
 
+/* ── Shopping list ── */
+.shop-section-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6B5CE7;
+    margin: 1.1rem 0 0.45rem;
+}
+.shop-section-label.done {
+    color: #AAAAAA;
+}
+.shop-missing-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0.5rem 0 0.9rem;
+}
+.shop-missing-item {
+    background: #FFF3CD;
+    color: #7A5800;
+    border: 1px solid #FFE08A;
+    border-radius: 16px;
+    padding: 2px 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
 /* ── Recipe tag (meal type / diet) ── */
 .recipe-tag {
     display: inline-block;
@@ -252,25 +280,44 @@ html, body, [class*="css"] {
     box-shadow: 0 2px 6px rgba(225,112,85,0.3);
 }
 
-/* ── Shopping list ── */
+/* ── Browse All — “Add ingredients to list” buttons ── */
+[class*="st-key-addlist"] button {
+    background: linear-gradient(135deg, #6B5CE7, #A29BFE) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 10px !important;
+    font-weight: 700 !important;
+    font-size: 0.84rem !important;
+    box-shadow: 0 3px 10px rgba(107,92,231,0.28) !important;
+    transition: box-shadow 0.15s ease, transform 0.1s ease !important;
+}
+[class*="st-key-addlist"] button:hover {
+    box-shadow: 0 5px 16px rgba(107,92,231,0.45) !important;
+    transform: translateY(-2px) !important;
+}
+[class*="st-key-addlist"] button:active {
+    transform: translateY(0) !important;
+}
+
+/* ── Shopping list (modal) ── */
 .shopping-list {
-    background: linear-gradient(135deg, #FFF5F0, #FFF0E8);
-    border: 1.5px solid #FFBBA0;
-    border-radius: 12px;
-    padding: 1rem 1.25rem;
+    background: linear-gradient(135deg, #F0FBF8, #E8F8F5);
+    border: 1.5px solid #A8E6D9;
+    border-radius: 14px;
+    padding: 1rem 1.25rem 0.85rem;
     margin-top: 0.75rem;
 }
 .shopping-list-title {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 700;
-    color: #D63031;
+    color: #00856F;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.09em;
     margin-bottom: 0.5rem;
 }
 .shopping-item {
-    font-size: 0.9rem;
-    color: #6B3222;
+    font-size: 0.88rem;
+    color: #1E4D42;
     padding: 3px 0;
     font-weight: 500;
 }
