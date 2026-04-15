@@ -137,18 +137,80 @@ html, body, [class*="css"] {
     background: #E17055;
 }
 
-/* ── Recipe cards (expanders) ── */
-div[data-testid="stExpander"] {
+/* ── Recipe result cards ── */
+.result-card {
     background: #FFFFFF;
-    border: 1.5px solid #EAE5F0 !important;
-    border-radius: 14px !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    border: 1.5px solid #EAE5F0;
+    border-radius: 14px;
+    padding: 1rem 1.25rem 0.6rem;
     margin-bottom: 0.6rem;
-    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
-div[data-testid="stExpander"]:hover {
-    box-shadow: 0 4px 16px rgba(0,0,0,0.09);
-    border-color: #C8B8F0 !important;
+.result-card:hover {
+    box-shadow: 0 4px 16px rgba(107,92,231,0.13);
+    border-color: #C8B8F0;
+}
+.result-card-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1A1A1A;
+    margin-bottom: 0.2rem;
+}
+.result-card-meta {
+    font-size: 0.78rem;
+    color: #999999;
+    margin-bottom: 0.6rem;
+}
+.match-bar-bg {
+    background: #F0EDE8;
+    border-radius: 99px;
+    height: 6px;
+    width: 100%;
+    overflow: hidden;
+    margin-bottom: 0.3rem;
+}
+.match-bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width 0.4s ease;
+}
+.match-pct {
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+/* ── Cuisine tag ── */
+.cuisine-tag {
+    display: inline-block;
+    background: linear-gradient(135deg, #0984E3, #74B9FF);
+    color: #FFFFFF;
+    border-radius: 20px;
+    padding: 3px 11px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-right: 6px;
+    box-shadow: 0 2px 6px rgba(9,132,227,0.3);
+    vertical-align: middle;
+}
+
+/* ── Modal ── */
+.modal-title {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #1A1A1A;
+    margin-bottom: 0.2rem;
+}
+.modal-meta {
+    font-size: 0.85rem;
+    color: #888888;
+}
+.modal-score {
+    font-weight: 700;
+    color: #6B5CE7;
 }
 
 /* ── Ingredient badges ── */

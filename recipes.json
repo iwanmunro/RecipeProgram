@@ -1,6 +1,7 @@
 [
   {
     "name": "Spaghetti Bolognese",
+    "cuisine": "Italian",
     "ingredients": [
       "spaghetti",
       "minced beef",
@@ -18,6 +19,7 @@
   },
   {
     "name": "Chicken Stir Fry",
+    "cuisine": "Asian",
     "ingredients": [
       "chicken breast",
       "soy sauce",
@@ -35,6 +37,7 @@
   },
   {
     "name": "Vegetable Soup",
+    "cuisine": "British",
     "ingredients": [
       "onion",
       "carrot",
@@ -52,6 +55,7 @@
   },
   {
     "name": "Cheese Omelette",
+    "cuisine": "French",
     "ingredients": [
       "eggs",
       "cheddar cheese",
@@ -64,6 +68,7 @@
   },
   {
     "name": "Banana Pancakes",
+    "cuisine": "American",
     "ingredients": [
       "banana",
       "eggs",
@@ -76,6 +81,7 @@
   },
   {
     "name": "Greek Salad",
+    "cuisine": "Greek",
     "ingredients": [
       "tomato",
       "cucumber",
@@ -92,6 +98,7 @@
   },
   {
     "name": "Tomato Pasta",
+    "cuisine": "Italian",
     "ingredients": [
       "pasta",
       "tinned tomatoes",
@@ -107,6 +114,7 @@
   },
   {
     "name": "Garlic Bread",
+    "cuisine": "Italian",
     "ingredients": [
       "baguette",
       "butter",
@@ -119,6 +127,7 @@
   },
   {
     "name": "Lentil Dal",
+    "cuisine": "Indian",
     "ingredients": [
       "red lentils",
       "onion",
@@ -138,6 +147,7 @@
   },
   {
     "name": "Tuna Pasta Bake",
+    "cuisine": "British",
     "ingredients": [
       "pasta",
       "tinned tuna",
@@ -152,5 +162,99 @@
     ],
     "method": "1. Cook pasta and drain.\n2. Make cheese sauce: melt butter, stir in flour, add milk gradually, stir in cheese.\n3. Mix pasta, tuna and sweetcorn into sauce.\n4. Top with extra cheese and bake at 200°C for 20 minutes.",
     "servings": 4
+  },
+  {
+    "name": "Chicken Tikka Masala",
+    "cuisine": "Indian",
+    "ingredients": [
+      "chicken breast",
+      "tinned tomatoes",
+      "double cream",
+      "onion",
+      "garlic",
+      "ginger",
+      "tikka masala paste",
+      "vegetable oil",
+      "coriander",
+      "salt"
+    ],
+    "method": "1. Fry onion in oil until soft.\n2. Add garlic, ginger and tikka masala paste; cook 2 minutes.\n3. Add diced chicken and brown all over.\n4. Pour in tinned tomatoes and simmer 15 minutes.\n5. Stir in cream, season and garnish with coriander.\n6. Serve with rice or naan.",
+    "servings": 4
+  },
+  {
+    "name": "Beef Tacos",
+    "cuisine": "Mexican",
+    "ingredients": [
+      "minced beef",
+      "taco shells",
+      "onion",
+      "garlic",
+      "cumin",
+      "paprika",
+      "chilli powder",
+      "tinned tomatoes",
+      "cheddar cheese",
+      "sour cream",
+      "lettuce",
+      "lime"
+    ],
+    "method": "1. Brown mince with onion and garlic.\n2. Add spices and cook 1 minute.\n3. Stir in tinned tomatoes and simmer until thick.\n4. Warm taco shells and fill with mince mixture.\n5. Top with cheese, sour cream, lettuce and a squeeze of lime.",
+    "servings": 4
+  },
+  {
+    "name": "Ramen",
+    "cuisine": "Japanese",
+    "ingredients": [
+      "ramen noodles",
+      "chicken stock",
+      "soy sauce",
+      "miso paste",
+      "garlic",
+      "ginger",
+      "eggs",
+      "spring onion",
+      "sesame oil",
+      "nori"
+    ],
+    "method": "1. Simmer stock with garlic, ginger, soy sauce and miso.\n2. Cook noodles separately and drain.\n3. Soft-boil eggs for 6 minutes; peel and halve.\n4. Divide noodles into bowls, pour over hot broth.\n5. Top with egg halves, spring onion, nori and a drizzle of sesame oil.",
+    "servings": 2
+  },
+  {
+    "name": "Shakshuka",
+    "cuisine": "Middle Eastern",
+    "ingredients": [
+      "eggs",
+      "tinned tomatoes",
+      "onion",
+      "garlic",
+      "bell pepper",
+      "cumin",
+      "paprika",
+      "chilli flakes",
+      "olive oil",
+      "feta cheese",
+      "parsley"
+    ],
+    "method": "1. Fry onion and pepper in olive oil until soft.\n2. Add garlic and spices; cook 1 minute.\n3. Pour in tinned tomatoes and simmer 10 minutes.\n4. Make wells in the sauce and crack in eggs.\n5. Cover and cook until whites are set but yolks still runny.\n6. Crumble over feta and scatter parsley. Serve with crusty bread.",
+    "servings": 2
+  },
+  {
+    "name": "Pad Thai",
+    "cuisine": "Thai",
+    "ingredients": [
+      "rice noodles",
+      "prawns",
+      "eggs",
+      "spring onion",
+      "bean sprouts",
+      "garlic",
+      "fish sauce",
+      "oyster sauce",
+      "lime",
+      "peanuts",
+      "vegetable oil"
+    ],
+    "method": "1. Soak noodles per packet instructions.\n2. Stir fry garlic and prawns in oil until pink.\n3. Push to one side, scramble eggs in the pan.\n4. Add drained noodles, fish sauce and oyster sauce; toss well.\n5. Stir in bean sprouts and spring onion.\n6. Serve with lime wedges and crushed peanuts on top.",
+    "servings": 2
   }
 ]

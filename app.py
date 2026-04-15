@@ -5,6 +5,19 @@ import streamlit as st
 # ── Constants ────────────────────────────────────────────────────────────────
 RECIPES_FILE = Path(__file__).parent / "recipes.json"
 
+CARD_COLOURS = [
+    ("#6B5CE7", "#FFFFFF"), ("#00B894", "#FFFFFF"), ("#E17055", "#FFFFFF"),
+    ("#0984E3", "#FFFFFF"), ("#FDCB6E", "#4A3000"), ("#FD79A8", "#FFFFFF"),
+    ("#00CEC9", "#FFFFFF"), ("#A29BFE", "#FFFFFF"), ("#55EFC4", "#1A4A3A"),
+    ("#FF7675", "#FFFFFF"),
+]
+
+CUISINES = [
+    "American", "Asian", "British", "Chinese", "French", "Greek",
+    "Indian", "Italian", "Japanese", "Mediterranean", "Mexican",
+    "Middle Eastern", "Thai", "Other",
+]
+
 
 # ── Data helpers ─────────────────────────────────────────────────────────────
 
@@ -34,6 +47,99 @@ def ingredients_match(have: list[str], need: list[str]) -> tuple[list[str], list
         else:
             missing.append(ingredient)
     return matched, missing
+
+
+def match_score(have: list[str], need: list[str]) -> float:
+    """Fraction of recipe ingredients covered by fridge contents. Returns [0, 1]."""
+    if not need:
+        return 0.0
+    matched, _ = ingredients_match(have, need)
+    return len(matched) / len(need)
+
+
+# ── Modal (must be module-level for @st.dialog to work) ──────────────────────
+
+@st.dialog("Recipe", width="large")
+def show_recipe(recipe: dict, matched: list, missing: list) -> None:
+    pct = round(match_score(st.session_state.get("fridge", []), recipe["ingredients"]) * 100)
+    cuisine = recipe.get("cuisine", "")
+    cuisine_html = f'<span class="cuisine-tag">{cuisine}</span>&nbsp;&nbsp;' if cuisine else ""
+    st.markdown(
+        f'<div class="modal-title">{recipe["name"]}</div>'
+        f'<div class="modal-meta">'
+        f'{cuisine_html}'
+        f'{recipe.get("servings","?")} servings &nbsp;·&nbsp; '
+        f'{len(recipe["ingredients"])} ingredients &nbsp;·&nbsp; '
+        f'<span class="modal-score">{pct}% match</span>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown("---")
+    ing_html = " ".join(
+        [f'<span class="badge-have">{i}</span>' for i in matched]
+        + [f'<span class="badge-missing">{i}</span>' for i in missing]
+    )
+    st.markdown(ing_html, unsafe_allow_html=True)
+    if missing:
+        items = "".join(f'<div class="shopping-item">&bull; {i}</div>' for i in missing)
+        st.markdown(
+            f'<div class="shopping-list" style="margin-top:0.75rem;">'
+            f'<div class="shopping-list-title">🛔 Still need</div>{items}</div>',
+            unsafe_allow_html=True,
+        )
+    st.markdown(
+        f'<div class="method-block">{recipe.get("method","No method provided.")}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def recipe_card(recipe: dict, matched: list, missing: list, pct: int, key_prefix: str) -> None:
+    bar_colour = "#00B894" if not missing else "#E17055"
+    n_ing = len(recipe["ingredients"])
+    servings = recipe.get("servings", "?")
+
+    # .st-key-{key} is added by Streamlit (≥1.30) to the widget wrapper div,
+    # letting us style individual buttons without touching others.
+    safe_key = (
+        f"{key_prefix}_{recipe['name']}"
+        .replace(" ", "-").replace("'", "").replace(",", "").replace("(", "").replace(")", "")
+    )
+    st.markdown(
+        f"""
+        <style>
+        .st-key-{safe_key} button {{
+            background: linear-gradient(to right, {bar_colour}28 {pct}%, #FFFFFF {pct}%) !important;
+            border: 1.5px solid #EAE5F0 !important;
+            border-radius: 14px !important;
+            padding: 0.85rem 1.25rem !important;
+            text-align: left !important;
+            height: auto !important;
+            white-space: pre-wrap !important;
+            color: #1A1A1A !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            font-size: 0.95rem !important;
+            font-weight: 700 !important;
+            line-height: 1.55 !important;
+            transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+        }}
+        .st-key-{safe_key} button:hover {{
+            box-shadow: 0 5px 18px rgba(107,92,231,0.14) !important;
+            border-color: #C8B8F0 !important;
+            transform: translateY(-2px);
+        }}
+        .st-key-{safe_key} button:active {{
+            transform: translateY(0);
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    cuisine = recipe.get("cuisine", "")
+    cuisine_str = f"{cuisine}  ·  " if cuisine else ""
+    match_str = f"{pct}% match  ·  " if pct > 0 else ""
+    label = f"{recipe['name']}\n{cuisine_str}{match_str}{servings} servings  ·  {n_ing} ingredients"
+    if st.button(label, key=safe_key, use_container_width=True):
+        show_recipe(recipe, matched, missing)
 
 
 # ── Page config ──────────────────────────────────────────────────────────────
@@ -77,17 +183,9 @@ tab_search, tab_browse, tab_add = st.tabs(["Find Recipes", "Browse All", "Add Re
 with tab_search:
 
     # ── Fridge panel ─────────────────────────────────────────────────────────
-    CARD_COLOURS = [
-        ("#6B5CE7", "#FFFFFF"), ("#00B894", "#FFFFFF"), ("#E17055", "#FFFFFF"),
-        ("#0984E3", "#FFFFFF"), ("#FDCB6E", "#4A3000"), ("#FD79A8", "#FFFFFF"),
-        ("#00CEC9", "#FFFFFF"), ("#A29BFE", "#FFFFFF"), ("#55EFC4", "#1A4A3A"),
-        ("#FF7675", "#FFFFFF"),
-    ]
-
     st.markdown('<div class="fridge-panel">', unsafe_allow_html=True)
     st.markdown('<h3>🧊 What\'s in your fridge?</h3>', unsafe_allow_html=True)
 
-    # st.form makes pressing Enter trigger the submit button
     with st.form("fridge_form", clear_on_submit=True):
         col_input, col_btn = st.columns([8, 1])
         with col_input:
@@ -105,35 +203,34 @@ with tab_search:
             st.session_state.fridge.append(item)
             st.rerun()
 
-    # Ingredient cards
+    # Ingredient cards — each is a real button so clicking removes it
     if st.session_state.fridge:
-        cards_html = '<div class="ingredient-grid">'
+        st.markdown('<p class="remove-hint">Click an ingredient to remove it</p>',
+                    unsafe_allow_html=True)
+        cols = st.columns(len(st.session_state.fridge))
+        to_remove = None
         for idx, ing in enumerate(st.session_state.fridge):
             bg, fg = CARD_COLOURS[idx % len(CARD_COLOURS)]
-            cards_html += (
-                f'<div class="ingredient-card" style="background:{bg};color:{fg};">'
-                f'<span class="ing-icon">✓</span>{ing}'
-                f'</div>'
-            )
-        cards_html += "</div>"
-        st.markdown(cards_html, unsafe_allow_html=True)
+            with cols[idx]:
+                st.markdown(
+                    f'<style>'
+                    f'div[data-testid="stButton"] button[kind="secondary"]#ing_btn_{idx} {{'
+                    f'  background:{bg}; color:{fg}; border:none;'
+                    f'  border-radius:12px; font-weight:600; font-size:0.85rem;'
+                    f'  box-shadow:0 2px 8px rgba(0,0,0,0.15);'
+                    f'}}'
+                    f'</style>',
+                    unsafe_allow_html=True,
+                )
+                if st.button(f"✓ {ing}", key=f"ing_btn_{idx}", use_container_width=True):
+                    to_remove = ing
+        if to_remove:
+            st.session_state.fridge.remove(to_remove)
+            st.rerun()
 
-        col_remove, col_clear = st.columns([4, 1])
-        with col_remove:
-            st.markdown('<p class="remove-hint">Select an ingredient below to remove it</p>',
-                        unsafe_allow_html=True)
-            remove_choice = st.selectbox(
-                "remove", options=["—"] + st.session_state.fridge,
-                key="remove_select", label_visibility="collapsed",
-            )
-            if remove_choice != "—":
-                st.session_state.fridge.remove(remove_choice)
-                st.rerun()
-        with col_clear:
-            st.markdown("<div style='margin-top:1.6rem'></div>", unsafe_allow_html=True)
-            if st.button("Clear all", use_container_width=True, key="clear_btn"):
-                st.session_state.fridge = []
-                st.rerun()
+        if st.button("Clear all", key="clear_btn"):
+            st.session_state.fridge = []
+            st.rerun()
     else:
         st.markdown('<p class="chip-empty">No ingredients added yet.</p>', unsafe_allow_html=True)
 
@@ -147,91 +244,54 @@ with tab_search:
         st.markdown('<div class="empty-state">No recipes yet — add some in the <b>Add Recipe</b> tab.</div>',
                     unsafe_allow_html=True)
     else:
-        max_missing_setting = st.slider(
-            "Also show recipes where I'm missing up to ___ ingredients",
-            min_value=0, max_value=5, value=2,
-        )
-
-        can_make, nearly_there = [], []
+        # Score every recipe with cosine similarity, split into exact / partial
+        scored = []
         for recipe in st.session_state.recipes:
             matched, missing = ingredients_match(st.session_state.fridge, recipe["ingredients"])
-            if len(missing) == 0:
-                can_make.append((recipe, matched, missing))
-            elif len(missing) <= max_missing_setting:
-                nearly_there.append((recipe, matched, missing))
+            score = match_score(st.session_state.fridge, recipe["ingredients"])
+            pct = round(score * 100)
+            scored.append((recipe, matched, missing, score, pct))
 
-        nearly_there.sort(key=lambda x: len(x[2]))
+        can_make   = [(r, m, ms, s, p) for r, m, ms, s, p in scored if len(ms) == 0]
+        nearly     = [(r, m, ms, s, p) for r, m, ms, s, p in scored if len(m) != 0 and len(ms) != 0]
 
-        # ── Can make now ──────────────────────────────────────────────────────
-        st.markdown(
-            f'<div class="section-heading">✅ Ready to cook'
-            f' <span class="count">{len(can_make)}</span></div>',
-            unsafe_allow_html=True,
-        )
+        # Sort both groups by descending cosine score
+        can_make.sort(key=lambda x: x[3], reverse=True)
+        nearly.sort(key=lambda x: x[3], reverse=True)
 
+        # ── Side-by-side columns ──────────────────────────────────────────────
+        col_left, col_right = st.columns(2, gap="large")
 
-        if not can_make:
+        with col_left:
             st.markdown(
-                '<div class="empty-state" style="padding:1rem;">No exact matches yet. '
-                'Add more ingredients or allow missing ingredients using the slider above.</div>',
+                f'<div class="section-heading">✅ Ready to cook'
+                f' <span class="count">{len(can_make)}</span></div>',
                 unsafe_allow_html=True,
             )
-        else:
-            for recipe, matched, _ in can_make:
-                badges = " ".join(
-                    f'<span class="badge-have">{i}</span>' for i in recipe["ingredients"]
+            if not can_make:
+                st.markdown(
+                    '<div class="empty-state" style="padding:1rem 0;">No exact matches yet — '
+                    'try adding more ingredients.</div>',
+                    unsafe_allow_html=True,
                 )
-                with st.expander(f"**{recipe['name']}**  ·  {recipe.get('servings', '?')} servings"):
-                    st.markdown(f'<div style="margin-bottom:0.5rem;">{badges}</div>',
-                                unsafe_allow_html=True)
-                    st.markdown(
-                        f'<div class="method-block">{recipe.get("method", "No method provided.")}</div>',
-                        unsafe_allow_html=True,
-                    )
+            else:
+                for recipe, matched, missing, score, pct in can_make:
+                    recipe_card(recipe, matched, missing, pct, "can")
 
-        st.markdown('<hr class="styled-divider">', unsafe_allow_html=True)
-
-        # ── Nearly there ─────────────────────────────────────────────────────
-        st.markdown(
-            f'<div class="section-heading nearly">🛒 Nearly there'
-            f' <span class="count">{len(nearly_there)}</span></div>',
-            unsafe_allow_html=True,
-        )
-
-        if not nearly_there:
+        with col_right:
             st.markdown(
-                '<div class="empty-state" style="padding:1rem;">No near-matches within your limit. '
-                'Try increasing the slider.</div>',
+                f'<div class="section-heading nearly">🛒 Nearly there'
+                f' <span class="count">{len(nearly)}</span></div>',
                 unsafe_allow_html=True,
             )
-        else:
-            for recipe, matched, missing in nearly_there:
-                label = (
-                    f"**{recipe['name']}**  ·  "
-                    f"missing {len(missing)} ingredient{'s' if len(missing) > 1 else ''}"
+            if not nearly:
+                st.markdown(
+                    '<div class="empty-state" style="padding:1rem 0;">No near-matches found.</div>',
+                    unsafe_allow_html=True,
                 )
-                with st.expander(label):
-                    badges = " ".join(
-                        [f'<span class="badge-have">{i}</span>' for i in matched]
-                        + [f'<span class="badge-missing">{i}</span>' for i in missing]
-                    )
-                    st.markdown(f'<div style="margin-bottom:0.5rem;">{badges}</div>',
-                                unsafe_allow_html=True)
-
-                    shopping_items = "".join(
-                        f'<div class="shopping-item">• {item}</div>' for item in missing
-                    )
-                    st.markdown(
-                        f'<div class="shopping-list">'
-                        f'<div class="shopping-list-title">🛍 Still need</div>'
-                        f'{shopping_items}'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
-                    st.markdown(
-                        f'<div class="method-block">{recipe.get("method", "No method provided.")}</div>',
-                        unsafe_allow_html=True,
-                    )
+            else:
+                for recipe, matched, missing, score, pct in nearly:
+                    recipe_card(recipe, matched, missing, pct, "near")
 
 
 # ── Tab 2: Browse ─────────────────────────────────────────────────────────────
@@ -244,20 +304,38 @@ with tab_browse:
             unsafe_allow_html=True,
         )
     else:
-        search_term = st.text_input(
-            "search_browse",
-            label_visibility="collapsed",
-            placeholder="🔍  Filter by recipe name or ingredient…",
-            key="browse_search",
-        )
+        # ── Filters ──────────────────────────────────────────────────────────
+        col_search, col_cuisine = st.columns([3, 2])
+        with col_search:
+            search_term = st.text_input(
+                "search_browse",
+                label_visibility="collapsed",
+                placeholder="🔍  Filter by name or ingredient…",
+                key="browse_search",
+            )
+        with col_cuisine:
+            available_cuisines = sorted(
+                {r.get("cuisine", "Other") for r in recipes if r.get("cuisine")}
+            )
+            selected_cuisines = st.multiselect(
+                "Cuisines",
+                options=available_cuisines,
+                placeholder="🌍  Filter by cuisine…",
+                label_visibility="collapsed",
+                key="browse_cuisines",
+            )
+
+        # ── Apply filters ─────────────────────────────────────────────────────
         filtered = recipes
         if search_term:
             term = normalise(search_term)
             filtered = [
-                r for r in recipes
+                r for r in filtered
                 if term in normalise(r["name"])
                 or any(term in normalise(i) for i in r["ingredients"])
             ]
+        if selected_cuisines:
+            filtered = [r for r in filtered if r.get("cuisine") in selected_cuisines]
 
         st.markdown(
             f"<p style='color:#999;font-size:0.82rem;margin:0.25rem 0 1rem;'>"
@@ -265,26 +343,25 @@ with tab_browse:
             unsafe_allow_html=True,
         )
 
-        for recipe in filtered:
-            with st.expander(
-                f"**{recipe['name']}**  ·  {recipe.get('servings', '?')} servings  ·  "
-                f"{len(recipe['ingredients'])} ingredients"
-            ):
-                badges = " ".join(
-                    f'<span class="badge-have">{i}</span>' for i in recipe["ingredients"]
-                )
-                st.markdown(f'<div style="margin-bottom:0.5rem;">{badges}</div>',
-                            unsafe_allow_html=True)
-                st.markdown(
-                    f'<div class="method-block">{recipe.get("method", "No method provided.")}</div>',
-                    unsafe_allow_html=True,
-                )
-                if st.button(f"Delete recipe", key=f"del_{recipe['name']}"):
-                    st.session_state.recipes = [
-                        r for r in st.session_state.recipes if r["name"] != recipe["name"]
-                    ]
-                    save_recipes(st.session_state.recipes)
-                    st.rerun()
+        if not filtered:
+            st.markdown(
+                '<div class="empty-state">No recipes match your filters.</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            col_left, col_right = st.columns(2, gap="large")
+            for idx, recipe in enumerate(filtered):
+                col = col_left if idx % 2 == 0 else col_right
+                with col:
+                    recipe_card(recipe, recipe["ingredients"], [], 0, "browse")
+                    if st.button("🗑 Delete", key=f"del_{recipe['name']}",
+                                 use_container_width=True):
+                        st.session_state.recipes = [
+                            r for r in st.session_state.recipes
+                            if r["name"] != recipe["name"]
+                        ]
+                        save_recipes(st.session_state.recipes)
+                        st.rerun()
 
 
 # ── Tab 3: Add recipe ─────────────────────────────────────────────────────────
@@ -298,6 +375,8 @@ with tab_add:
         col_a, col_b = st.columns(2)
         with col_a:
             servings = st.number_input("Servings", min_value=1, max_value=20, value=2)
+        with col_b:
+            cuisine = st.selectbox("Cuisine", options=CUISINES)
         ingredients_raw = st.text_area(
             "Ingredients",
             placeholder="One per line:\nchicken breast\ngarlic\ntinned tomatoes",
@@ -327,6 +406,7 @@ with tab_add:
                 ]
                 new_recipe = {
                     "name": name.strip(),
+                    "cuisine": cuisine,
                     "ingredients": ingredients_list,
                     "method": method.strip(),
                     "servings": int(servings),
