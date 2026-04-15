@@ -182,7 +182,7 @@ def extract_recipe_from_image(image_bytes: bytes, media_type: str, api_key: str)
     """Send an image to Gemini and return a parsed recipe dict."""
     import io
     _genai.configure(api_key=api_key)
-    model = _genai.GenerativeModel("gemini-2.0-flash")
+    model = _genai.GenerativeModel("gemini-1.5-flash")
     image = _PIL_Image.open(io.BytesIO(image_bytes))
     prompt = (
         "Extract the recipe from this image. "
