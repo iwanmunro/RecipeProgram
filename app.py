@@ -3,6 +3,9 @@ import os
 import base64
 import difflib
 import re
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from pathlib import Path
 import streamlit as st
 
@@ -74,6 +77,19 @@ def match_score(have: list[str], need: list[str]) -> float:
     return len(matched) / len(need)
 
 
+@st.cache_data
+def _score_all(recipes: list[dict], fridge: list[str]) -> list[tuple]:
+    """Score every recipe against the fridge. Cached so it only runs when inputs change."""
+    scored = []
+    for recipe in recipes:
+        matched, missing = ingredients_match(fridge, recipe["ingredients"])
+        n = len(recipe["ingredients"])
+        score = len(matched) / n if n else 0.0
+        scored.append((recipe, matched, missing, score, round(score * 100)))
+    return scored
+
+
+@st.cache_data
 def get_ingredient_vocab(recipes: list[dict]) -> list[str]:
     """Deduplicated list of all ingredient names across stored recipes."""
     seen: set[str] = set()
@@ -95,6 +111,33 @@ def suggest_ingredient(text: str, recipes: list[dict]) -> str | None:
     if matches and matches[0] != norm:
         return matches[0]
     return None
+
+
+def send_shopping_list_email(to_addr: str, items: list[dict], smtp_cfg: dict) -> None:
+    """Send the shopping list as a plain-text email via SMTP."""
+    to_buy  = [i for i in items if not i["checked"]]
+    in_cart = [i for i in items if i["checked"]]
+    lines = ["Shopping List", "=" * 30, ""]
+    if to_buy:
+        lines.append("TO BUY:")
+        for i in to_buy:
+            src = f"  ({i['source']})" if i.get("source") else ""
+            lines.append(f"  \u2022 {i['item']}{src}")
+        lines.append("")
+    if in_cart:
+        lines.append("ALREADY TICKED:")
+        for i in in_cart:
+            src = f"  ({i['source']})" if i.get("source") else ""
+            lines.append(f"  \u2713 {i['item']}{src}")
+    msg = MIMEMultipart()
+    msg["From"]    = smtp_cfg["user"]
+    msg["To"]      = to_addr
+    msg["Subject"] = "\U0001f6d2 My Shopping List"
+    msg.attach(MIMEText("\n".join(lines), "plain"))
+    with smtplib.SMTP(smtp_cfg["host"], smtp_cfg["port"]) as s:
+        s.starttls()
+        s.login(smtp_cfg["user"], smtp_cfg["password"])
+        s.send_message(msg)
 
 
 def extract_recipe_from_image(image_bytes: bytes, media_type: str, api_key: str) -> dict:
@@ -138,6 +181,59 @@ def extract_recipe_from_image(image_bytes: bytes, media_type: str, api_key: str)
 
 
 # ── Modal (must be module-level for @st.dialog to work) ──────────────────────
+
+@st.dialog("\U0001f4e7 Email shopping list", width="small")
+def email_list() -> None:
+    try:
+        smtp_cfg = {
+            "host":     st.secrets.get("SMTP_HOST", ""),
+            "port":     int(st.secrets.get("SMTP_PORT", 587)),
+            "user":     st.secrets.get("SMTP_USER", ""),
+            "password": st.secrets.get("SMTP_PASSWORD", ""),
+        }
+        default_email = st.secrets.get("DEFAULT_EMAIL", "")
+    except Exception:
+        smtp_cfg = {"host": "", "port": 587, "user": "", "password": ""}
+        default_email = ""
+    if not smtp_cfg["host"] or not smtp_cfg["user"]:
+        st.warning(
+            "Add SMTP settings to `.streamlit/secrets.toml` to enable email:\n\n"
+            "```toml\n"
+            "SMTP_HOST     = \"smtp.gmail.com\"\n"
+            "SMTP_PORT     = 587\n"
+            "SMTP_USER     = \"you@gmail.com\"\n"
+            "SMTP_PASSWORD = \"your-app-password\"\n"
+            "DEFAULT_EMAIL = \"you@gmail.com\"\n"
+            "```"
+        )
+        return
+    to_addr = st.text_input(
+        "Send to",
+        value=default_email,
+        placeholder="email@example.com",
+        key="email_to_addr",
+    )
+    to_buy_count = sum(1 for i in st.session_state.shopping_list if not i["checked"])
+    st.markdown(
+        f"<p style='color:#888;font-size:0.82rem;margin:0.1rem 0 0.7rem;'>"
+        f"{to_buy_count} item(s) to buy on the list.</p>",
+        unsafe_allow_html=True,
+    )
+    if st.button(
+        "Send \U0001f4e8",
+        key="email_send_btn",
+        use_container_width=True,
+        disabled=not to_addr.strip(),
+    ):
+        with st.spinner("Sending\u2026"):
+            try:
+                send_shopping_list_email(
+                    to_addr.strip(), st.session_state.shopping_list, smtp_cfg
+                )
+                st.success(f"\u2705 Sent to {to_addr}!")
+            except Exception as exc:
+                st.error(f"Failed: {exc}")
+
 
 @st.dialog("Recipe", width="large")
 def show_recipe(recipe: dict, matched: list, missing: list) -> None:
@@ -305,47 +401,46 @@ def pick_ingredients(recipe: dict) -> None:
             st.rerun()
 
 
-def recipe_card(recipe: dict, matched: list, missing: list, pct: int, key_prefix: str) -> None:
+def recipe_card(recipe: dict, matched: list, missing: list, pct: int, key_prefix: str, inject_css: bool = True) -> None:
     bar_colour = "#00B894" if not missing else "#E17055"
     n_ing = len(recipe["ingredients"])
     servings = recipe.get("servings", "?")
 
-    # .st-key-{key} is added by Streamlit (≥1.30) to the widget wrapper div,
-    # letting us style individual buttons without touching others.
     safe_key = (
         f"{key_prefix}_{recipe['name']}"
         .replace(" ", "-").replace("'", "").replace(",", "").replace("(", "").replace(")", "")
     )
-    st.markdown(
-        f"""
-        <style>
-        .st-key-{safe_key} button {{
-            background: linear-gradient(to right, {bar_colour}28 {pct}%, #FFFFFF {pct}%) !important;
-            border: 1.5px solid #EAE5F0 !important;
-            border-radius: 14px !important;
-            padding: 0.85rem 1.25rem !important;
-            text-align: left !important;
-            height: auto !important;
-            white-space: pre-wrap !important;
-            color: #1A1A1A !important;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            font-size: 0.95rem !important;
-            font-weight: 700 !important;
-            line-height: 1.55 !important;
-            transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
-        }}
-        .st-key-{safe_key} button:hover {{
-            box-shadow: 0 5px 18px rgba(107,92,231,0.14) !important;
-            border-color: #C8B8F0 !important;
-            transform: translateY(-2px);
-        }}
-        .st-key-{safe_key} button:active {{
-            transform: translateY(0);
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    if inject_css:
+        st.markdown(
+            f"""
+            <style>
+            .st-key-{safe_key} button {{
+                background: linear-gradient(to right, {bar_colour}28 {pct}%, #FFFFFF {pct}%) !important;
+                border: 1.5px solid #EAE5F0 !important;
+                border-radius: 14px !important;
+                padding: 0.85rem 1.25rem !important;
+                text-align: left !important;
+                height: auto !important;
+                white-space: pre-wrap !important;
+                color: #1A1A1A !important;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+                font-size: 0.95rem !important;
+                font-weight: 700 !important;
+                line-height: 1.55 !important;
+                transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+            }}
+            .st-key-{safe_key} button:hover {{
+                box-shadow: 0 5px 18px rgba(107,92,231,0.14) !important;
+                border-color: #C8B8F0 !important;
+                transform: translateY(-2px);
+            }}
+            .st-key-{safe_key} button:active {{
+                transform: translateY(0);
+            }}
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
     cuisine = recipe.get("cuisine", "")
     cuisine_str = f"{cuisine}  ·  " if cuisine else ""
     match_str = f"{pct}% match  ·  " if pct > 0 else ""
@@ -489,18 +584,12 @@ with tab_search:
         st.markdown('<div class="empty-state">No recipes yet — add some in the <b>Add Recipe</b> tab.</div>',
                     unsafe_allow_html=True)
     else:
-        # Score every recipe with cosine similarity, split into exact / partial
-        scored = []
-        for recipe in st.session_state.recipes:
-            matched, missing = ingredients_match(st.session_state.fridge, recipe["ingredients"])
-            score = match_score(st.session_state.fridge, recipe["ingredients"])
-            pct = round(score * 100)
-            scored.append((recipe, matched, missing, score, pct))
+        # Score every recipe — cached, only recomputes when fridge or recipes change
+        scored = _score_all(st.session_state.recipes, st.session_state.fridge)
 
-        can_make   = [(r, m, ms, s, p) for r, m, ms, s, p in scored if len(ms) == 0]
-        nearly     = [(r, m, ms, s, p) for r, m, ms, s, p in scored if len(m) != 0 and len(ms) != 0]
+        can_make = [(r, m, ms, s, p) for r, m, ms, s, p in scored if len(ms) == 0]
+        nearly   = [(r, m, ms, s, p) for r, m, ms, s, p in scored if len(m) != 0 and len(ms) != 0]
 
-        # Sort both groups by descending cosine score
         can_make.sort(key=lambda x: x[3], reverse=True)
         nearly.sort(key=lambda x: x[3], reverse=True)
 
@@ -622,7 +711,7 @@ with tab_browse:
             for idx, recipe in enumerate(filtered):
                 col = col_left if idx % 2 == 0 else col_right
                 with col:
-                    recipe_card(recipe, recipe["ingredients"], [], 0, "browse")
+                    recipe_card(recipe, recipe["ingredients"], [], 0, "browse", inject_css=False)
                     btn_col, del_col = st.columns([3, 1])
                     with btn_col:
                         if st.button(
@@ -810,7 +899,7 @@ with tab_shop:
         in_cart = [i for i in sl if i["checked"]]
 
         # Action bar
-        col_rm, col_cl = st.columns(2)
+        col_rm, col_em, col_cl = st.columns(3)
         with col_rm:
             if in_cart and st.button(
                 f"Remove ticked ({len(in_cart)})",
@@ -819,6 +908,9 @@ with tab_shop:
             ):
                 st.session_state.shopping_list = to_buy
                 st.rerun()
+        with col_em:
+            if st.button("\U0001f4e7 Email list", key="shop_email_btn", use_container_width=True):
+                email_list()
         with col_cl:
             if st.button("Clear all", key="shop_clear_all", use_container_width=True):
                 st.session_state.shopping_list = []

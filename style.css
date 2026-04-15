@@ -280,6 +280,28 @@ html, body, [class*="css"] {
     box-shadow: 0 2px 6px rgba(225,112,85,0.3);
 }
 
+/* ── Browse All recipe cards (single global rule replaces per-card injection) ── */
+[class*="st-key-browse_"] button {
+    background: #FFFFFF !important;
+    border: 1.5px solid #EAE5F0 !important;
+    border-radius: 14px !important;
+    padding: 0.85rem 1.25rem !important;
+    text-align: left !important;
+    height: auto !important;
+    white-space: pre-wrap !important;
+    color: #1A1A1A !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    font-size: 0.95rem !important;
+    font-weight: 700 !important;
+    line-height: 1.55 !important;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+[class*="st-key-browse_"] button:hover {
+    box-shadow: 0 5px 18px rgba(107,92,231,0.14) !important;
+    border-color: #C8B8F0 !important;
+    transform: translateY(-2px);
+}
+
 /* ── Browse All — “Add ingredients to list” buttons ── */
 [class*="st-key-addlist"] button {
     background: linear-gradient(135deg, #6B5CE7, #A29BFE) !important;
