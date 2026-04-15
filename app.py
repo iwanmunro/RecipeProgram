@@ -1,6 +1,5 @@
 import json
 import os
-import base64
 import difflib
 import re
 import urllib.parse
@@ -8,10 +7,11 @@ from pathlib import Path
 import streamlit as st
 
 try:
-    import anthropic as _anthropic
-    _ANTHROPIC_AVAILABLE = True
+    import google.generativeai as _genai
+    import PIL.Image as _PIL_Image
+    _GEMINI_AVAILABLE = True
 except ImportError:
-    _ANTHROPIC_AVAILABLE = False
+    _GEMINI_AVAILABLE = False
 
 # ── Constants ────────────────────────────────────────────────────────────────
 RECIPES_FILE = Path(__file__).parent / "recipes.json"
@@ -179,40 +179,26 @@ def _format_list_text(items: list[dict]) -> str:
 
 
 def extract_recipe_from_image(image_bytes: bytes, media_type: str, api_key: str) -> dict:
-    """Send an image to Claude and return a parsed recipe dict."""
-    client = _anthropic.Anthropic(api_key=api_key)
-    b64 = base64.standard_b64encode(image_bytes).decode()
-    response = client.messages.create(
-        model="claude-opus-4-5",
-        max_tokens=1500,
-        messages=[{
-            "role": "user",
-            "content": [
-                {
-                    "type": "image",
-                    "source": {"type": "base64", "media_type": media_type, "data": b64},
-                },
-                {
-                    "type": "text",
-                    "text": (
-                        "Extract the recipe from this image. "
-                        "Return ONLY valid JSON with exactly these keys:\n"
-                        '{"name": "...", "cuisine": "...", "servings": 2, '
-                        '"tags": ["..."], '
-                        '"ingredients": ["...", "..."], "method": "..."}\n'
-                        "For 'tags', choose only from this list (include all that apply): "
-                        "Breakfast, Brunch, Lunch, Dinner, Dessert, Snack, Starter, Side dish, Soup, Salad, "
-                        "Bread, Cake, Vegetarian, Vegan, Gluten-free, Dairy-free, Low calorie, Healthy, Quick, Make ahead.\n"
-                        "List each ingredient as its own array item, lowercase, without quantities. "
-                        "Write the method as a single string with numbered steps separated by \\n. "
-                        "If a field cannot be determined use an empty string (or 2 for servings, [] for tags)."
-                    ),
-                },
-            ],
-        }],
+    """Send an image to Gemini and return a parsed recipe dict."""
+    import io
+    _genai.configure(api_key=api_key)
+    model = _genai.GenerativeModel("gemini-2.0-flash")
+    image = _PIL_Image.open(io.BytesIO(image_bytes))
+    prompt = (
+        "Extract the recipe from this image. "
+        "Return ONLY valid JSON with exactly these keys:\n"
+        '{"name": "...", "cuisine": "...", "servings": 2, '
+        '"tags": ["..."], '
+        '"ingredients": ["...", "..."], "method": "..."}\n'
+        "For 'tags', choose only from this list (include all that apply): "
+        "Breakfast, Brunch, Lunch, Dinner, Dessert, Snack, Starter, Side dish, Soup, Salad, "
+        "Bread, Cake, Vegetarian, Vegan, Gluten-free, Dairy-free, Low calorie, Healthy, Quick, Make ahead.\n"
+        "List each ingredient as its own array item, lowercase, without quantities. "
+        "Write the method as a single string with numbered steps separated by \\n. "
+        "If a field cannot be determined use an empty string (or 2 for servings, [] for tags)."
     )
-    text = response.content[0].text
-    found = re.search(r"\{.*\}", text, re.DOTALL)
+    response = model.generate_content([prompt, image])
+    found = re.search(r"\{.*\}", response.text, re.DOTALL)
     if found:
         return json.loads(found.group())
     return {}
@@ -732,19 +718,20 @@ with tab_add:
 
     # ── Photo extraction ────────────────────────────────────────────────────
     with st.expander("📷 Extract from a photo", expanded=False):
-        if not _ANTHROPIC_AVAILABLE:
-            st.info("`anthropic` package not installed — run `pip install anthropic`.")
+        if not _GEMINI_AVAILABLE:
+            st.info("`google-generativeai` and `Pillow` packages not installed — run `pip install google-generativeai Pillow`.")
         else:
-            _api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+            _api_key = os.environ.get("GEMINI_API_KEY", "")
             if not _api_key:
                 try:
-                    _api_key = st.secrets.get("ANTHROPIC_API_KEY", "")
+                    _api_key = st.secrets.get("GEMINI_API_KEY", "")
                 except Exception:
                     _api_key = ""
             if not _api_key:
                 st.warning(
-                    "Set `ANTHROPIC_API_KEY` in `.streamlit/secrets.toml` or as an "
-                    "environment variable to enable photo extraction."
+                    "Set `GEMINI_API_KEY` in `.streamlit/secrets.toml` or as an "
+                    "environment variable to enable photo extraction. "
+                    "Get a free key at [aistudio.google.com](https://aistudio.google.com)."
                 )
             else:
                 uploaded_file = st.file_uploader(
@@ -757,7 +744,7 @@ with tab_add:
                     st.image(uploaded_file, use_container_width=True)
                     if st.button("✨ Extract recipe details", key="extract_btn",
                                  use_container_width=True):
-                        with st.spinner("Reading recipe with Claude…"):
+                        with st.spinner("Reading recipe with Gemini…"):
                             try:
                                 data = extract_recipe_from_image(
                                     uploaded_file.read(), uploaded_file.type, _api_key
