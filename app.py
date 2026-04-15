@@ -4,6 +4,7 @@ import base64
 import difflib
 import re
 import smtplib
+import urllib.parse
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -159,6 +160,25 @@ def _coloured_tags(tags: list[str]) -> str:
         f'<span class="recipe-tag {_TAG_CLASS.get(t, "")}">{t}</span>'
         for t in tags
     )
+
+
+def _format_list_text(items: list[dict]) -> str:
+    """Plain-text representation of the shopping list for sharing/export."""
+    to_buy  = [i for i in items if not i["checked"]]
+    in_cart = [i for i in items if i["checked"]]
+    lines = ["\U0001f6d2 Shopping List", ""]
+    if to_buy:
+        lines.append("TO BUY:")
+        for i in to_buy:
+            src = f"  ({i['source']})" if i.get("source") else ""
+            lines.append(f"  \u2022 {i['item']}{src}")
+        lines.append("")
+    if in_cart:
+        lines.append("ALREADY TICKED:")
+        for i in in_cart:
+            src = f"  ({i['source']})" if i.get("source") else ""
+            lines.append(f"  \u2713 {i['item']}{src}")
+    return "\n".join(lines)
 
 
 def send_shopping_list_email(to_addr: str, items: list[dict], smtp_cfg: dict) -> None:
@@ -963,8 +983,8 @@ with tab_shop:
         to_buy  = [i for i in sl if not i["checked"]]
         in_cart = [i for i in sl if i["checked"]]
 
-        # Action bar
-        col_rm, col_em, col_cl = st.columns(3)
+        # Action bar ── row 1: housekeeping
+        col_rm, col_cl = st.columns(2)
         with col_rm:
             if in_cart and st.button(
                 f"Remove ticked ({len(in_cart)})",
@@ -973,13 +993,38 @@ with tab_shop:
             ):
                 st.session_state.shopping_list = to_buy
                 st.rerun()
-        with col_em:
-            if st.button("\U0001f4e7 Email list", key="shop_email_btn", use_container_width=True):
-                email_list()
         with col_cl:
             if st.button("Clear all", key="shop_clear_all", use_container_width=True):
                 st.session_state.shopping_list = []
                 st.rerun()
+
+        # Row 2: share / export (no credentials needed for first three)
+        list_text  = _format_list_text(st.session_state.shopping_list)
+        mailto_url = "mailto:?subject=" + urllib.parse.quote("\U0001f6d2 Shopping List") + "&body=" + urllib.parse.quote(list_text)
+        wa_url     = "https://wa.me/?text=" + urllib.parse.quote(list_text)
+        sh1, sh2, sh3, sh4 = st.columns(4)
+        with sh1:
+            st.download_button(
+                "\u2b07\ufe0f Download .txt",
+                data=list_text,
+                file_name="shopping_list.txt",
+                mime="text/plain",
+                use_container_width=True,
+                key="shop_dl",
+            )
+        with sh2:
+            st.markdown(
+                f'<a href="{mailto_url}" target="_blank" class="share-btn">✉️ Email app</a>',
+                unsafe_allow_html=True,
+            )
+        with sh3:
+            st.markdown(
+                f'<a href="{wa_url}" target="_blank" class="share-btn whatsapp-btn">💬 WhatsApp</a>',
+                unsafe_allow_html=True,
+            )
+        with sh4:
+            if st.button("\U0001f4e7 SMTP email", key="shop_email_btn", use_container_width=True):
+                email_list()
 
         # Rows helper
         def _shop_rows(items: list[dict]) -> None:

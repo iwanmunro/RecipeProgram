@@ -346,6 +346,39 @@ html, body, [class*="css"] {
     transform: translateY(0) !important;
 }
 
+/* ── Shopping list share buttons (anchor-styled to match st buttons) ── */
+.share-btn {
+    display: block;
+    text-align: center;
+    background: #FFFFFF;
+    border: 1.5px solid #D5CCF0;
+    border-radius: 8px;
+    padding: 0.42rem 0.25rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1A1A1A;
+    text-decoration: none;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.share-btn:hover {
+    border-color: #A29BFE;
+    box-shadow: 0 3px 10px rgba(107,92,231,0.2);
+    transform: translateY(-1px);
+    text-decoration: none;
+    color: #1A1A1A;
+}
+.share-btn.whatsapp-btn {
+    background: #25D366;
+    border-color: #1DAA51;
+    color: #FFFFFF;
+}
+.share-btn.whatsapp-btn:hover {
+    background: #1DAA51;
+    border-color: #128C3B;
+    box-shadow: 0 3px 10px rgba(37,211,102,0.35);
+    color: #FFFFFF;
+}
+
 /* ── Shopping list (modal) ── */
 .shopping-list {
     background: linear-gradient(135deg, #F0FBF8, #E8F8F5);
