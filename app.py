@@ -38,6 +38,37 @@ PREDEFINED_TAGS = [
     "Low calorie", "Healthy", "Quick", "Make ahead",
 ]
 
+# Cuisine → (accent-colour, card-tint) for Browse All cards
+CUISINE_COLOURS: dict[str, tuple[str, str]] = {
+    "American":       ("#E17055", "#FFF6F4"),
+    "Asian":          ("#E84393", "#FFF1F7"),
+    "British":        ("#2980B9", "#F0F7FF"),
+    "Chinese":        ("#C0392B", "#FFF3F2"),
+    "French":         ("#8B7FF0", "#F5F3FF"),
+    "Greek":          ("#27AE60", "#F1FBF5"),
+    "Indian":         ("#E67E22", "#FFFBF5"),
+    "Italian":        ("#C0392B", "#FFF5F4"),
+    "Japanese":       ("#E84393", "#FFF2F7"),
+    "Mediterranean":  ("#0984E3", "#F0F8FF"),
+    "Mexican":        ("#27AE60", "#F0FBF4"),
+    "Middle Eastern": ("#F39C12", "#FFFCF0"),
+    "Thai":           ("#16A085", "#F0FBFA"),
+    "Other":          ("#7F8C8D", "#F8F8F8"),
+}
+
+# Tag → CSS class for colour-coded pills
+_TAG_CLASS: dict[str, str] = {
+    "Vegetarian": "tag-green", "Vegan": "tag-green",
+    "Gluten-free": "tag-green", "Dairy-free": "tag-green",
+    "Low calorie": "tag-green", "Healthy": "tag-green",
+    "Breakfast": "tag-amber", "Brunch": "tag-amber",
+    "Lunch": "tag-amber", "Dinner": "tag-amber", "Snack": "tag-amber",
+    "Dessert": "tag-pink", "Cake": "tag-pink", "Starter": "tag-pink",
+    "Side dish": "tag-pink", "Bread": "tag-pink",
+    "Soup": "tag-teal", "Salad": "tag-teal",
+    "Quick": "tag-teal", "Make ahead": "tag-teal",
+}
+
 
 # ── Data helpers ─────────────────────────────────────────────────────────────
 
@@ -111,6 +142,23 @@ def suggest_ingredient(text: str, recipes: list[dict]) -> str | None:
     if matches and matches[0] != norm:
         return matches[0]
     return None
+
+
+def _safe_key(prefix: str, name: str) -> str:
+    """Consistent safe CSS key from a prefix + recipe name."""
+    return (
+        f"{prefix}_{name}"
+        .replace(" ", "-").replace("'", "").replace(",", "")
+        .replace("(", "").replace(")", "")
+    )
+
+
+def _coloured_tags(tags: list[str]) -> str:
+    """HTML spans for each tag, colour-classed by category."""
+    return "".join(
+        f'<span class="recipe-tag {_TAG_CLASS.get(t, "")}">{t}</span>'
+        for t in tags
+    )
 
 
 def send_shopping_list_email(to_addr: str, items: list[dict], smtp_cfg: dict) -> None:
@@ -241,7 +289,7 @@ def show_recipe(recipe: dict, matched: list, missing: list) -> None:
     cuisine = recipe.get("cuisine", "")
     cuisine_html = f'<span class="cuisine-tag">{cuisine}</span>&nbsp;' if cuisine else ""
     tags = recipe.get("tags", [])
-    tags_html = "".join(f'<span class="recipe-tag">{t}</span>' for t in tags)
+    tags_html = _coloured_tags(tags)
     st.markdown(
         f'<div class="modal-title">{recipe["name"]}</div>'
         f'<div class="modal-meta">'
@@ -707,6 +755,23 @@ with tab_browse:
                 unsafe_allow_html=True,
             )
         else:
+            # Inject ONE combined CSS block for all visible cards (cuisine tint + accent)
+            browse_css_parts: list[str] = []
+            for r in filtered:
+                acc, tint = CUISINE_COLOURS.get(r.get("cuisine", ""), ("#A29BFE", "#F8F7FF"))
+                sk = _safe_key("browse", r["name"])
+                browse_css_parts.append(
+                    f".st-key-{sk} button {{"
+                    f"background:{tint}!important;"
+                    f"border-left:4px solid {acc}!important;"
+                    f"}}"
+                    f".st-key-{sk} button:hover {{"
+                    f"border-color:{acc}!important;"
+                    f"box-shadow:0 5px 18px {acc}30!important;"
+                    f"}}"
+                )
+            st.markdown(f"<style>{''.join(browse_css_parts)}</style>", unsafe_allow_html=True)
+
             col_left, col_right = st.columns(2, gap="large")
             for idx, recipe in enumerate(filtered):
                 col = col_left if idx % 2 == 0 else col_right

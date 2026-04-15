@@ -6,7 +6,7 @@ html, body, [class*="css"] {
 
 /* ── Page background ── */
 .stApp {
-    background-color: #F0EDE8;
+    background: linear-gradient(160deg, #F5F1EC 0%, #EDE8E0 60%, #E8E4F0 100%);
 }
 
 /* ── Hide default Streamlit chrome ── */
@@ -60,12 +60,12 @@ html, body, [class*="css"] {
 
 /* ── Fridge panel ── */
 .fridge-panel {
-    background: linear-gradient(145deg, #FFFFFF 0%, #F8F6FF 100%);
-    border: 1.5px solid #E0D9F5;
+    background: linear-gradient(145deg, #FFFFFF 0%, #F4F1FF 100%);
+    border: 2px solid #C5B8F5;
     border-radius: 20px;
     padding: 1.75rem 2rem;
     margin-bottom: 2rem;
-    box-shadow: 0 4px 20px rgba(99,75,200,0.08);
+    box-shadow: 0 4px 24px rgba(99,75,200,0.12);
 }
 .fridge-panel h3 {
     font-size: 0.78rem;
@@ -126,15 +126,17 @@ html, body, [class*="css"] {
     border-left-color: #E17055;
 }
 .section-heading .count {
-    background: #00B894;
+    background: linear-gradient(135deg, #00B894, #00CEC9);
     color: #FFFFFF;
     border-radius: 20px;
     padding: 2px 10px;
     font-size: 0.72rem;
     font-weight: 700;
+    box-shadow: 0 2px 6px rgba(0,184,148,0.35);
 }
 .section-heading.nearly .count {
-    background: #E17055;
+    background: linear-gradient(135deg, #E17055, #D63031);
+    box-shadow: 0 2px 6px rgba(225,112,85,0.35);
 }
 
 /* ── Recipe result cards ── */
@@ -228,9 +230,9 @@ html, body, [class*="css"] {
 /* ── Recipe tag (meal type / diet) ── */
 .recipe-tag {
     display: inline-block;
-    background: #F0EDE8;
-    color: #5A5260;
-    border: 1.5px solid #D5CCF0;
+    background: #EDEDF5;
+    color: #5A5270;
+    border: 1.5px solid #CECCEE;
     border-radius: 20px;
     padding: 2px 10px;
     font-size: 0.70rem;
@@ -238,6 +240,30 @@ html, body, [class*="css"] {
     letter-spacing: 0.03em;
     margin: 0 3px 3px 0;
     vertical-align: middle;
+}
+/* Diet / healthy → green */
+.recipe-tag.tag-green {
+    background: #E8F8F0;
+    color: #0A6E4E;
+    border-color: #A8E0C8;
+}
+/* Meal time → warm amber */
+.recipe-tag.tag-amber {
+    background: #FFF8E8;
+    color: #7A5000;
+    border-color: #FFD980;
+}
+/* Course / baking → pink */
+.recipe-tag.tag-pink {
+    background: #FFF0F6;
+    color: #8B0052;
+    border-color: #FFAED4;
+}
+/* Technique / style → teal */
+.recipe-tag.tag-teal {
+    background: #E8F8FA;
+    color: #0A5C65;
+    border-color: #90D5DC;
 }
 
 /* ── Modal ── */
@@ -280,17 +306,17 @@ html, body, [class*="css"] {
     box-shadow: 0 2px 6px rgba(225,112,85,0.3);
 }
 
-/* ── Browse All recipe cards (single global rule replaces per-card injection) ── */
+/* ── Browse All recipe cards (base style — bg/tint set per-card via Python injection) ── */
 [class*="st-key-browse_"] button {
-    background: #FFFFFF !important;
-    border: 1.5px solid #EAE5F0 !important;
+    background: #FFFFFF;
+    border: 1.5px solid #E4DFF5 !important;
     border-radius: 14px !important;
     padding: 0.85rem 1.25rem !important;
     text-align: left !important;
     height: auto !important;
     white-space: pre-wrap !important;
     color: #1A1A1A !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
     font-size: 0.95rem !important;
     font-weight: 700 !important;
     line-height: 1.55 !important;
@@ -298,7 +324,6 @@ html, body, [class*="css"] {
 }
 [class*="st-key-browse_"] button:hover {
     box-shadow: 0 5px 18px rgba(107,92,231,0.14) !important;
-    border-color: #C8B8F0 !important;
     transform: translateY(-2px);
 }
 
