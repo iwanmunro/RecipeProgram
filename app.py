@@ -7,7 +7,7 @@ from pathlib import Path
 import streamlit as st
 
 try:
-    import google.generativeai as _genai
+    from google import genai as _genai
     import PIL.Image as _PIL_Image
     _GEMINI_AVAILABLE = True
 except ImportError:
@@ -181,8 +181,7 @@ def _format_list_text(items: list[dict]) -> str:
 def extract_recipe_from_image(image_bytes: bytes, media_type: str, api_key: str) -> dict:
     """Send an image to Gemini and return a parsed recipe dict."""
     import io
-    _genai.configure(api_key=api_key)
-    model = _genai.GenerativeModel("gemini-1.5-flash")
+    client = _genai.Client(api_key=api_key)
     image = _PIL_Image.open(io.BytesIO(image_bytes))
     prompt = (
         "Extract the recipe from this image. "
@@ -197,7 +196,10 @@ def extract_recipe_from_image(image_bytes: bytes, media_type: str, api_key: str)
         "Write the method as a single string with numbered steps separated by \\n. "
         "If a field cannot be determined use an empty string (or 2 for servings, [] for tags)."
     )
-    response = model.generate_content([prompt, image])
+    response = client.models.generate_content(
+        model="gemini-2.0-flash-lite",
+        contents=[prompt, image],
+    )
     found = re.search(r"\{.*\}", response.text, re.DOTALL)
     if found:
         return json.loads(found.group())
