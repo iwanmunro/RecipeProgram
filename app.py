@@ -1,6 +1,16 @@
 import json
+import os
+import base64
+import difflib
+import re
 from pathlib import Path
 import streamlit as st
+
+try:
+    import anthropic as _anthropic
+    _ANTHROPIC_AVAILABLE = True
+except ImportError:
+    _ANTHROPIC_AVAILABLE = False
 
 # ── Constants ────────────────────────────────────────────────────────────────
 RECIPES_FILE = Path(__file__).parent / "recipes.json"
@@ -16,6 +26,13 @@ CUISINES = [
     "American", "Asian", "British", "Chinese", "French", "Greek",
     "Indian", "Italian", "Japanese", "Mediterranean", "Mexican",
     "Middle Eastern", "Thai", "Other",
+]
+
+PREDEFINED_TAGS = [
+    "Breakfast", "Brunch", "Lunch", "Dinner", "Dessert", "Snack",
+    "Starter", "Side dish", "Soup", "Salad", "Bread", "Cake",
+    "Vegetarian", "Vegan", "Gluten-free", "Dairy-free",
+    "Low calorie", "Healthy", "Quick", "Make ahead",
 ]
 
 
@@ -57,17 +74,84 @@ def match_score(have: list[str], need: list[str]) -> float:
     return len(matched) / len(need)
 
 
+def get_ingredient_vocab(recipes: list[dict]) -> list[str]:
+    """Deduplicated list of all ingredient names across stored recipes."""
+    seen: set[str] = set()
+    vocab: list[str] = []
+    for r in recipes:
+        for ing in r.get("ingredients", []):
+            n = normalise(ing)
+            if n not in seen:
+                seen.add(n)
+                vocab.append(n)
+    return vocab
+
+
+def suggest_ingredient(text: str, recipes: list[dict]) -> str | None:
+    """Return a corrected spelling if a close match exists in the known ingredient vocab."""
+    norm = normalise(text)
+    vocab = get_ingredient_vocab(recipes)
+    matches = difflib.get_close_matches(norm, vocab, n=1, cutoff=0.75)
+    if matches and matches[0] != norm:
+        return matches[0]
+    return None
+
+
+def extract_recipe_from_image(image_bytes: bytes, media_type: str, api_key: str) -> dict:
+    """Send an image to Claude and return a parsed recipe dict."""
+    client = _anthropic.Anthropic(api_key=api_key)
+    b64 = base64.standard_b64encode(image_bytes).decode()
+    response = client.messages.create(
+        model="claude-opus-4-5",
+        max_tokens=1500,
+        messages=[{
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": media_type, "data": b64},
+                },
+                {
+                    "type": "text",
+                    "text": (
+                        "Extract the recipe from this image. "
+                        "Return ONLY valid JSON with exactly these keys:\n"
+                        '{"name": "...", "cuisine": "...", "servings": 2, '
+                        '"tags": ["..."], '
+                        '"ingredients": ["...", "..."], "method": "..."}\n'
+                        "For 'tags', choose only from this list (include all that apply): "
+                        "Breakfast, Brunch, Lunch, Dinner, Dessert, Snack, Starter, Side dish, Soup, Salad, "
+                        "Bread, Cake, Vegetarian, Vegan, Gluten-free, Dairy-free, Low calorie, Healthy, Quick, Make ahead.\n"
+                        "List each ingredient as its own array item, lowercase, without quantities. "
+                        "Write the method as a single string with numbered steps separated by \\n. "
+                        "If a field cannot be determined use an empty string (or 2 for servings, [] for tags)."
+                    ),
+                },
+            ],
+        }],
+    )
+    text = response.content[0].text
+    found = re.search(r"\{.*\}", text, re.DOTALL)
+    if found:
+        return json.loads(found.group())
+    return {}
+
+
 # ── Modal (must be module-level for @st.dialog to work) ──────────────────────
 
 @st.dialog("Recipe", width="large")
 def show_recipe(recipe: dict, matched: list, missing: list) -> None:
     pct = round(match_score(st.session_state.get("fridge", []), recipe["ingredients"]) * 100)
     cuisine = recipe.get("cuisine", "")
-    cuisine_html = f'<span class="cuisine-tag">{cuisine}</span>&nbsp;&nbsp;' if cuisine else ""
+    cuisine_html = f'<span class="cuisine-tag">{cuisine}</span>&nbsp;' if cuisine else ""
+    tags = recipe.get("tags", [])
+    tags_html = "".join(f'<span class="recipe-tag">{t}</span>' for t in tags)
     st.markdown(
         f'<div class="modal-title">{recipe["name"]}</div>'
         f'<div class="modal-meta">'
-        f'{cuisine_html}'
+        f'{cuisine_html}{tags_html}'
+        f'</div>'
+        f'<div class="modal-meta" style="margin-top:0.35rem;">'
         f'{recipe.get("servings","?")} servings &nbsp;·&nbsp; '
         f'{len(recipe["ingredients"])} ingredients &nbsp;·&nbsp; '
         f'<span class="modal-score">{pct}% match</span>'
@@ -165,6 +249,10 @@ if "recipes" not in st.session_state:
 if "fridge" not in st.session_state:
     st.session_state.fridge = []
 
+if "pending_ingredient" not in st.session_state:
+    # Holds (original_text, suggestion) while awaiting user confirmation
+    st.session_state.pending_ingredient = None
+
 
 # ── App header ───────────────────────────────────────────────────────────────
 
@@ -200,8 +288,33 @@ with tab_search:
     if add_clicked:
         item = normalise(new_ing)
         if item and item not in [normalise(i) for i in st.session_state.fridge]:
-            st.session_state.fridge.append(item)
+            suggestion = suggest_ingredient(item, st.session_state.recipes)
+            if suggestion:
+                st.session_state.pending_ingredient = (item, suggestion)
+            else:
+                st.session_state.fridge.append(item)
             st.rerun()
+
+    # ── Fuzzy suggestion banner ───────────────────────────────────────────────
+    if st.session_state.pending_ingredient:
+        original, suggestion = st.session_state.pending_ingredient
+        st.markdown(
+            f'<div class="suggestion-banner">'  
+            f'🤔 Did you mean <strong>{suggestion}</strong> instead of <em>{original}</em>?'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        col_yes, col_no = st.columns(2)
+        with col_yes:
+            if st.button(f'✓ Use "{suggestion}"', key="sug_yes", use_container_width=True):
+                st.session_state.fridge.append(suggestion)
+                st.session_state.pending_ingredient = None
+                st.rerun()
+        with col_no:
+            if st.button(f'Keep "{original}"', key="sug_no", use_container_width=True):
+                st.session_state.fridge.append(original)
+                st.session_state.pending_ingredient = None
+                st.rerun()
 
     # Ingredient cards — each is a real button so clicking removes it
     if st.session_state.fridge:
@@ -324,7 +437,19 @@ with tab_browse:
                 label_visibility="collapsed",
                 key="browse_cuisines",
             )
-
+        available_tags = sorted(
+            {t for r in recipes for t in r.get("tags", [])}
+        )
+        if available_tags:
+            selected_tags = st.multiselect(
+                "Tags",
+                options=available_tags,
+                placeholder="🏷️  Filter by tag (Dessert, Vegan, Breakfast…)",
+                label_visibility="collapsed",
+                key="browse_tags",
+            )
+        else:
+            selected_tags = []
         # ── Apply filters ─────────────────────────────────────────────────────
         filtered = recipes
         if search_term:
@@ -336,6 +461,8 @@ with tab_browse:
             ]
         if selected_cuisines:
             filtered = [r for r in filtered if r.get("cuisine") in selected_cuisines]
+        if selected_tags:
+            filtered = [r for r in filtered if any(t in r.get("tags", []) for t in selected_tags)]
 
         st.markdown(
             f"<p style='color:#999;font-size:0.82rem;margin:0.25rem 0 1rem;'>"
@@ -370,22 +497,100 @@ with tab_add:
     st.markdown('<div style="max-width:680px;margin:0 auto;">', unsafe_allow_html=True)
     st.markdown("### Add a new recipe")
 
+    # ── Photo extraction ────────────────────────────────────────────────────
+    with st.expander("📷 Extract from a photo", expanded=False):
+        if not _ANTHROPIC_AVAILABLE:
+            st.info("`anthropic` package not installed — run `pip install anthropic`.")
+        else:
+            _api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+            if not _api_key:
+                try:
+                    _api_key = st.secrets.get("ANTHROPIC_API_KEY", "")
+                except Exception:
+                    _api_key = ""
+            if not _api_key:
+                st.warning(
+                    "Set `ANTHROPIC_API_KEY` in `.streamlit/secrets.toml` or as an "
+                    "environment variable to enable photo extraction."
+                )
+            else:
+                uploaded_file = st.file_uploader(
+                    "Upload a photo of a handwritten or printed recipe",
+                    type=["jpg", "jpeg", "png"],
+                    key="recipe_image_upload",
+                    label_visibility="collapsed",
+                )
+                if uploaded_file:
+                    st.image(uploaded_file, use_container_width=True)
+                    if st.button("✨ Extract recipe details", key="extract_btn",
+                                 use_container_width=True):
+                        with st.spinner("Reading recipe with Claude…"):
+                            try:
+                                data = extract_recipe_from_image(
+                                    uploaded_file.read(), uploaded_file.type, _api_key
+                                )
+                                if data:
+                                    st.session_state["ar_name"] = data.get("name", "")
+                                    st.session_state["ar_ingredients"] = "\n".join(
+                                        data.get("ingredients", [])
+                                    )
+                                    st.session_state["ar_method"] = data.get("method", "")
+                                    try:
+                                        st.session_state["ar_servings"] = int(
+                                            data.get("servings", 2)
+                                        )
+                                    except (ValueError, TypeError):
+                                        st.session_state["ar_servings"] = 2
+                                    cuisine_val = data.get("cuisine", "")
+                                    st.session_state["ar_cuisine"] = (
+                                        cuisine_val if cuisine_val in CUISINES else "Other"
+                                    )
+                                    extracted_tags = [
+                                        t for t in data.get("tags", [])
+                                        if t in PREDEFINED_TAGS
+                                    ]
+                                    st.session_state["ar_tags"] = extracted_tags
+                                    st.success(
+                                        "✅ Recipe extracted — review the fields below then save."
+                                    )
+                                    st.rerun()
+                                else:
+                                    st.error(
+                                        "Couldn't parse a recipe from that image. "
+                                        "Try a clearer or better-lit photo."
+                                    )
+                            except Exception as exc:
+                                st.error(f"Extraction failed: {exc}")
+
+    # ── Recipe form ─────────────────────────────────────────────────────────
     with st.form("add_recipe_form", clear_on_submit=True):
-        name = st.text_input("Recipe name", placeholder="e.g. Chicken Tikka Masala")
+        name = st.text_input(
+            "Recipe name", placeholder="e.g. Chicken Tikka Masala", key="ar_name"
+        )
         col_a, col_b = st.columns(2)
         with col_a:
-            servings = st.number_input("Servings", min_value=1, max_value=20, value=2)
+            servings = st.number_input(
+                "Servings", min_value=1, max_value=20, value=2, key="ar_servings"
+            )
         with col_b:
-            cuisine = st.selectbox("Cuisine", options=CUISINES)
+            cuisine = st.selectbox("Cuisine", options=CUISINES, key="ar_cuisine")
+        tags_selected = st.multiselect(
+            "Tags",
+            options=PREDEFINED_TAGS,
+            placeholder="e.g. Dinner, Vegetarian, Dessert…",
+            key="ar_tags",
+        )
         ingredients_raw = st.text_area(
             "Ingredients",
             placeholder="One per line:\nchicken breast\ngarlic\ntinned tomatoes",
             height=180,
+            key="ar_ingredients",
         )
         method = st.text_area(
             "Method",
             placeholder="Step-by-step instructions…",
             height=200,
+            key="ar_method",
         )
         submitted = st.form_submit_button("Save recipe", use_container_width=True)
 
@@ -407,6 +612,7 @@ with tab_add:
                 new_recipe = {
                     "name": name.strip(),
                     "cuisine": cuisine,
+                    "tags": tags_selected,
                     "ingredients": ingredients_list,
                     "method": method.strip(),
                     "servings": int(servings),

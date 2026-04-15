@@ -192,8 +192,23 @@ html, body, [class*="css"] {
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    margin-right: 6px;
+    margin-right: 4px;
     box-shadow: 0 2px 6px rgba(9,132,227,0.3);
+    vertical-align: middle;
+}
+
+/* ── Recipe tag (meal type / diet) ── */
+.recipe-tag {
+    display: inline-block;
+    background: #F0EDE8;
+    color: #5A5260;
+    border: 1.5px solid #D5CCF0;
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 0.70rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    margin: 0 3px 3px 0;
     vertical-align: middle;
 }
 
@@ -286,6 +301,26 @@ html, body, [class*="css"] {
     border: none;
     border-top: 1.5px solid #E4DEF5;
     margin: 2rem 0;
+}
+
+/* ── Fuzzy suggestion banner ── */
+.suggestion-banner {
+    background: linear-gradient(135deg, #FFF9E8, #FFF4D6);
+    border: 1.5px solid #FDCB6E;
+    border-radius: 12px;
+    padding: 0.75rem 1.1rem;
+    font-size: 0.9rem;
+    color: #4A3000;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 2px 8px rgba(253,203,110,0.25);
+}
+.suggestion-banner strong {
+    color: #00B894;
+}
+.suggestion-banner em {
+    color: #E17055;
+    font-style: normal;
+    text-decoration: line-through;
 }
 
 /* ── Remove hint ── */
