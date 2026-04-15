@@ -1,0 +1,10 @@
+services:
+  recipe-finder:
+    build: .
+    container_name: recipe-finder
+    ports:
+      - "8501:8501"
+    volumes:
+      # Mount recipes.json so changes persist outside the container
+      - ./recipes.json:/app/recipes.json
+    restart: unless-stopped

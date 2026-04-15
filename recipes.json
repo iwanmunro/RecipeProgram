@@ -1,0 +1,156 @@
+[
+  {
+    "name": "Spaghetti Bolognese",
+    "ingredients": [
+      "spaghetti",
+      "minced beef",
+      "onion",
+      "garlic",
+      "tinned tomatoes",
+      "tomato puree",
+      "olive oil",
+      "dried oregano",
+      "salt",
+      "pepper"
+    ],
+    "method": "1. Fry onion and garlic in olive oil until soft.\n2. Add mince and brown.\n3. Stir in tomato puree, tinned tomatoes, oregano, salt and pepper.\n4. Simmer 20 minutes.\n5. Cook spaghetti and serve with sauce on top.",
+    "servings": 4
+  },
+  {
+    "name": "Chicken Stir Fry",
+    "ingredients": [
+      "chicken breast",
+      "soy sauce",
+      "garlic",
+      "ginger",
+      "bell pepper",
+      "broccoli",
+      "spring onion",
+      "sesame oil",
+      "cornflour",
+      "rice"
+    ],
+    "method": "1. Slice chicken and marinate in soy sauce and cornflour.\n2. Stir fry garlic and ginger in sesame oil.\n3. Add chicken and cook through.\n4. Add vegetables and stir fry for 3-4 minutes.\n5. Serve over cooked rice.",
+    "servings": 2
+  },
+  {
+    "name": "Vegetable Soup",
+    "ingredients": [
+      "onion",
+      "carrot",
+      "celery",
+      "potato",
+      "vegetable stock",
+      "garlic",
+      "olive oil",
+      "salt",
+      "pepper",
+      "parsley"
+    ],
+    "method": "1. Sauté onion, garlic and celery in olive oil.\n2. Add chopped carrot and potato.\n3. Pour in stock and simmer 25 minutes.\n4. Season and garnish with parsley.",
+    "servings": 4
+  },
+  {
+    "name": "Cheese Omelette",
+    "ingredients": [
+      "eggs",
+      "cheddar cheese",
+      "butter",
+      "salt",
+      "pepper"
+    ],
+    "method": "1. Beat eggs with salt and pepper.\n2. Melt butter in pan over medium heat.\n3. Pour in eggs and let set at the edges.\n4. Add grated cheese, fold omelette and serve.",
+    "servings": 1
+  },
+  {
+    "name": "Banana Pancakes",
+    "ingredients": [
+      "banana",
+      "eggs",
+      "oats",
+      "butter",
+      "honey"
+    ],
+    "method": "1. Mash banana and mix with beaten eggs and oats.\n2. Fry spoonfuls in butter for 2-3 minutes each side.\n3. Drizzle with honey to serve.",
+    "servings": 2
+  },
+  {
+    "name": "Greek Salad",
+    "ingredients": [
+      "tomato",
+      "cucumber",
+      "red onion",
+      "feta cheese",
+      "olives",
+      "olive oil",
+      "oregano",
+      "salt",
+      "pepper"
+    ],
+    "method": "1. Chop tomato, cucumber and red onion.\n2. Combine in a bowl with olives and crumbled feta.\n3. Drizzle with olive oil, scatter oregano and season.",
+    "servings": 2
+  },
+  {
+    "name": "Tomato Pasta",
+    "ingredients": [
+      "pasta",
+      "tinned tomatoes",
+      "garlic",
+      "olive oil",
+      "basil",
+      "salt",
+      "pepper",
+      "parmesan"
+    ],
+    "method": "1. Cook pasta according to packet instructions.\n2. Fry garlic in olive oil for 1 minute.\n3. Add tinned tomatoes and simmer 10 minutes.\n4. Season and stir in fresh basil.\n5. Toss with pasta and serve with parmesan.",
+    "servings": 2
+  },
+  {
+    "name": "Garlic Bread",
+    "ingredients": [
+      "baguette",
+      "butter",
+      "garlic",
+      "parsley",
+      "salt"
+    ],
+    "method": "1. Mix softened butter with crushed garlic, parsley and salt.\n2. Slice baguette and spread with garlic butter.\n3. Wrap in foil and bake at 180°C for 10 minutes, then open foil for 5 minutes.",
+    "servings": 4
+  },
+  {
+    "name": "Lentil Dal",
+    "ingredients": [
+      "red lentils",
+      "onion",
+      "garlic",
+      "ginger",
+      "tinned tomatoes",
+      "cumin",
+      "turmeric",
+      "garam masala",
+      "coconut milk",
+      "oil",
+      "salt",
+      "rice"
+    ],
+    "method": "1. Fry onion in oil until golden.\n2. Add garlic, ginger and spices, cook 1 min.\n3. Add lentils, tomatoes and coconut milk.\n4. Simmer 20 minutes until lentils are soft.\n5. Season and serve with rice.",
+    "servings": 4
+  },
+  {
+    "name": "Tuna Pasta Bake",
+    "ingredients": [
+      "pasta",
+      "tinned tuna",
+      "tinned sweetcorn",
+      "cheddar cheese",
+      "milk",
+      "butter",
+      "plain flour",
+      "mustard",
+      "salt",
+      "pepper"
+    ],
+    "method": "1. Cook pasta and drain.\n2. Make cheese sauce: melt butter, stir in flour, add milk gradually, stir in cheese.\n3. Mix pasta, tuna and sweetcorn into sauce.\n4. Top with extra cheese and bake at 200°C for 20 minutes.",
+    "servings": 4
+  }
+]

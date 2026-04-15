@@ -1,0 +1,337 @@
+import json
+from pathlib import Path
+import streamlit as st
+
+# ── Constants ────────────────────────────────────────────────────────────────
+RECIPES_FILE = Path(__file__).parent / "recipes.json"
+
+
+# ── Data helpers ─────────────────────────────────────────────────────────────
+
+def load_recipes() -> list[dict]:
+    if RECIPES_FILE.exists():
+        with open(RECIPES_FILE, "r") as f:
+            return json.load(f)
+    return []
+
+
+def save_recipes(recipes: list[dict]) -> None:
+    with open(RECIPES_FILE, "w") as f:
+        json.dump(recipes, f, indent=2)
+
+
+def normalise(text: str) -> str:
+    return text.strip().lower()
+
+
+def ingredients_match(have: list[str], need: list[str]) -> tuple[list[str], list[str]]:
+    have_norm = [normalise(h) for h in have]
+    matched, missing = [], []
+    for ingredient in need:
+        ing_norm = normalise(ingredient)
+        if any(ing_norm in h or h in ing_norm for h in have_norm):
+            matched.append(ingredient)
+        else:
+            missing.append(ingredient)
+    return matched, missing
+
+
+# ── Page config ──────────────────────────────────────────────────────────────
+
+st.set_page_config(
+    page_title="Recipe Finder",
+    page_icon="🍽️",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
+def load_css(path: Path) -> None:
+    st.markdown(f"<style>{path.read_text()}</style>", unsafe_allow_html=True)
+
+load_css(Path(__file__).parent / "style.css")
+
+
+# ── State ────────────────────────────────────────────────────────────────────
+
+if "recipes" not in st.session_state:
+    st.session_state.recipes = load_recipes()
+
+if "fridge" not in st.session_state:
+    st.session_state.fridge = []
+
+
+# ── App header ───────────────────────────────────────────────────────────────
+
+st.markdown("""
+<div class="app-header">
+    <h1>🍽️ Recipe Finder</h1>
+    <p>Tell us what's in your fridge and we'll find what you can cook.</p>
+</div>
+""", unsafe_allow_html=True)
+
+tab_search, tab_browse, tab_add = st.tabs(["Find Recipes", "Browse All", "Add Recipe"])
+
+
+# ── Tab 1: Search ─────────────────────────────────────────────────────────────
+
+with tab_search:
+
+    # ── Fridge panel ─────────────────────────────────────────────────────────
+    CARD_COLOURS = [
+        ("#6B5CE7", "#FFFFFF"), ("#00B894", "#FFFFFF"), ("#E17055", "#FFFFFF"),
+        ("#0984E3", "#FFFFFF"), ("#FDCB6E", "#4A3000"), ("#FD79A8", "#FFFFFF"),
+        ("#00CEC9", "#FFFFFF"), ("#A29BFE", "#FFFFFF"), ("#55EFC4", "#1A4A3A"),
+        ("#FF7675", "#FFFFFF"),
+    ]
+
+    st.markdown('<div class="fridge-panel">', unsafe_allow_html=True)
+    st.markdown('<h3>🧊 What\'s in your fridge?</h3>', unsafe_allow_html=True)
+
+    # st.form makes pressing Enter trigger the submit button
+    with st.form("fridge_form", clear_on_submit=True):
+        col_input, col_btn = st.columns([8, 1])
+        with col_input:
+            new_ing = st.text_input(
+                "ingredient_input",
+                label_visibility="collapsed",
+                placeholder="Type an ingredient and press Enter or Add…",
+            )
+        with col_btn:
+            add_clicked = st.form_submit_button("Add", use_container_width=True)
+
+    if add_clicked:
+        item = normalise(new_ing)
+        if item and item not in [normalise(i) for i in st.session_state.fridge]:
+            st.session_state.fridge.append(item)
+            st.rerun()
+
+    # Ingredient cards
+    if st.session_state.fridge:
+        cards_html = '<div class="ingredient-grid">'
+        for idx, ing in enumerate(st.session_state.fridge):
+            bg, fg = CARD_COLOURS[idx % len(CARD_COLOURS)]
+            cards_html += (
+                f'<div class="ingredient-card" style="background:{bg};color:{fg};">'
+                f'<span class="ing-icon">✓</span>{ing}'
+                f'</div>'
+            )
+        cards_html += "</div>"
+        st.markdown(cards_html, unsafe_allow_html=True)
+
+        col_remove, col_clear = st.columns([4, 1])
+        with col_remove:
+            st.markdown('<p class="remove-hint">Select an ingredient below to remove it</p>',
+                        unsafe_allow_html=True)
+            remove_choice = st.selectbox(
+                "remove", options=["—"] + st.session_state.fridge,
+                key="remove_select", label_visibility="collapsed",
+            )
+            if remove_choice != "—":
+                st.session_state.fridge.remove(remove_choice)
+                st.rerun()
+        with col_clear:
+            st.markdown("<div style='margin-top:1.6rem'></div>", unsafe_allow_html=True)
+            if st.button("Clear all", use_container_width=True, key="clear_btn"):
+                st.session_state.fridge = []
+                st.rerun()
+    else:
+        st.markdown('<p class="chip-empty">No ingredients added yet.</p>', unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # ── Results ───────────────────────────────────────────────────────────────
+    if not st.session_state.fridge:
+        st.markdown('<div class="empty-state">Add ingredients above to see matching recipes.</div>',
+                    unsafe_allow_html=True)
+    elif not st.session_state.recipes:
+        st.markdown('<div class="empty-state">No recipes yet — add some in the <b>Add Recipe</b> tab.</div>',
+                    unsafe_allow_html=True)
+    else:
+        max_missing_setting = st.slider(
+            "Also show recipes where I'm missing up to ___ ingredients",
+            min_value=0, max_value=5, value=2,
+        )
+
+        can_make, nearly_there = [], []
+        for recipe in st.session_state.recipes:
+            matched, missing = ingredients_match(st.session_state.fridge, recipe["ingredients"])
+            if len(missing) == 0:
+                can_make.append((recipe, matched, missing))
+            elif len(missing) <= max_missing_setting:
+                nearly_there.append((recipe, matched, missing))
+
+        nearly_there.sort(key=lambda x: len(x[2]))
+
+        # ── Can make now ──────────────────────────────────────────────────────
+        st.markdown(
+            f'<div class="section-heading">✅ Ready to cook'
+            f' <span class="count">{len(can_make)}</span></div>',
+            unsafe_allow_html=True,
+        )
+
+
+        if not can_make:
+            st.markdown(
+                '<div class="empty-state" style="padding:1rem;">No exact matches yet. '
+                'Add more ingredients or allow missing ingredients using the slider above.</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            for recipe, matched, _ in can_make:
+                badges = " ".join(
+                    f'<span class="badge-have">{i}</span>' for i in recipe["ingredients"]
+                )
+                with st.expander(f"**{recipe['name']}**  ·  {recipe.get('servings', '?')} servings"):
+                    st.markdown(f'<div style="margin-bottom:0.5rem;">{badges}</div>',
+                                unsafe_allow_html=True)
+                    st.markdown(
+                        f'<div class="method-block">{recipe.get("method", "No method provided.")}</div>',
+                        unsafe_allow_html=True,
+                    )
+
+        st.markdown('<hr class="styled-divider">', unsafe_allow_html=True)
+
+        # ── Nearly there ─────────────────────────────────────────────────────
+        st.markdown(
+            f'<div class="section-heading nearly">🛒 Nearly there'
+            f' <span class="count">{len(nearly_there)}</span></div>',
+            unsafe_allow_html=True,
+        )
+
+        if not nearly_there:
+            st.markdown(
+                '<div class="empty-state" style="padding:1rem;">No near-matches within your limit. '
+                'Try increasing the slider.</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            for recipe, matched, missing in nearly_there:
+                label = (
+                    f"**{recipe['name']}**  ·  "
+                    f"missing {len(missing)} ingredient{'s' if len(missing) > 1 else ''}"
+                )
+                with st.expander(label):
+                    badges = " ".join(
+                        [f'<span class="badge-have">{i}</span>' for i in matched]
+                        + [f'<span class="badge-missing">{i}</span>' for i in missing]
+                    )
+                    st.markdown(f'<div style="margin-bottom:0.5rem;">{badges}</div>',
+                                unsafe_allow_html=True)
+
+                    shopping_items = "".join(
+                        f'<div class="shopping-item">• {item}</div>' for item in missing
+                    )
+                    st.markdown(
+                        f'<div class="shopping-list">'
+                        f'<div class="shopping-list-title">🛍 Still need</div>'
+                        f'{shopping_items}'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        f'<div class="method-block">{recipe.get("method", "No method provided.")}</div>',
+                        unsafe_allow_html=True,
+                    )
+
+
+# ── Tab 2: Browse ─────────────────────────────────────────────────────────────
+
+with tab_browse:
+    recipes = st.session_state.recipes
+    if not recipes:
+        st.markdown(
+            '<div class="empty-state">No recipes yet — add some in the <b>Add Recipe</b> tab.</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        search_term = st.text_input(
+            "search_browse",
+            label_visibility="collapsed",
+            placeholder="🔍  Filter by recipe name or ingredient…",
+            key="browse_search",
+        )
+        filtered = recipes
+        if search_term:
+            term = normalise(search_term)
+            filtered = [
+                r for r in recipes
+                if term in normalise(r["name"])
+                or any(term in normalise(i) for i in r["ingredients"])
+            ]
+
+        st.markdown(
+            f"<p style='color:#999;font-size:0.82rem;margin:0.25rem 0 1rem;'>"
+            f"Showing {len(filtered)} of {len(recipes)} recipes</p>",
+            unsafe_allow_html=True,
+        )
+
+        for recipe in filtered:
+            with st.expander(
+                f"**{recipe['name']}**  ·  {recipe.get('servings', '?')} servings  ·  "
+                f"{len(recipe['ingredients'])} ingredients"
+            ):
+                badges = " ".join(
+                    f'<span class="badge-have">{i}</span>' for i in recipe["ingredients"]
+                )
+                st.markdown(f'<div style="margin-bottom:0.5rem;">{badges}</div>',
+                            unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="method-block">{recipe.get("method", "No method provided.")}</div>',
+                    unsafe_allow_html=True,
+                )
+                if st.button(f"Delete recipe", key=f"del_{recipe['name']}"):
+                    st.session_state.recipes = [
+                        r for r in st.session_state.recipes if r["name"] != recipe["name"]
+                    ]
+                    save_recipes(st.session_state.recipes)
+                    st.rerun()
+
+
+# ── Tab 3: Add recipe ─────────────────────────────────────────────────────────
+
+with tab_add:
+    st.markdown('<div style="max-width:680px;margin:0 auto;">', unsafe_allow_html=True)
+    st.markdown("### Add a new recipe")
+
+    with st.form("add_recipe_form", clear_on_submit=True):
+        name = st.text_input("Recipe name", placeholder="e.g. Chicken Tikka Masala")
+        col_a, col_b = st.columns(2)
+        with col_a:
+            servings = st.number_input("Servings", min_value=1, max_value=20, value=2)
+        ingredients_raw = st.text_area(
+            "Ingredients",
+            placeholder="One per line:\nchicken breast\ngarlic\ntinned tomatoes",
+            height=180,
+        )
+        method = st.text_area(
+            "Method",
+            placeholder="Step-by-step instructions…",
+            height=200,
+        )
+        submitted = st.form_submit_button("Save recipe", use_container_width=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if submitted:
+        if not name.strip():
+            st.error("Please enter a recipe name.")
+        elif not ingredients_raw.strip():
+            st.error("Please enter at least one ingredient.")
+        else:
+            existing_names = [normalise(r["name"]) for r in st.session_state.recipes]
+            if normalise(name) in existing_names:
+                st.error(f"A recipe called '{name}' already exists.")
+            else:
+                ingredients_list = [
+                    line.strip() for line in ingredients_raw.splitlines() if line.strip()
+                ]
+                new_recipe = {
+                    "name": name.strip(),
+                    "ingredients": ingredients_list,
+                    "method": method.strip(),
+                    "servings": int(servings),
+                }
+                st.session_state.recipes.append(new_recipe)
+                save_recipes(st.session_state.recipes)
+                st.success(f"✅ '{name}' saved!")
+                st.rerun()
