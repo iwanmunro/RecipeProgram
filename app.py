@@ -3,10 +3,7 @@ import os
 import base64
 import difflib
 import re
-import smtplib
 import urllib.parse
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from pathlib import Path
 import streamlit as st
 
@@ -181,33 +178,6 @@ def _format_list_text(items: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def send_shopping_list_email(to_addr: str, items: list[dict], smtp_cfg: dict) -> None:
-    """Send the shopping list as a plain-text email via SMTP."""
-    to_buy  = [i for i in items if not i["checked"]]
-    in_cart = [i for i in items if i["checked"]]
-    lines = ["Shopping List", "=" * 30, ""]
-    if to_buy:
-        lines.append("TO BUY:")
-        for i in to_buy:
-            src = f"  ({i['source']})" if i.get("source") else ""
-            lines.append(f"  \u2022 {i['item']}{src}")
-        lines.append("")
-    if in_cart:
-        lines.append("ALREADY TICKED:")
-        for i in in_cart:
-            src = f"  ({i['source']})" if i.get("source") else ""
-            lines.append(f"  \u2713 {i['item']}{src}")
-    msg = MIMEMultipart()
-    msg["From"]    = smtp_cfg["user"]
-    msg["To"]      = to_addr
-    msg["Subject"] = "\U0001f6d2 My Shopping List"
-    msg.attach(MIMEText("\n".join(lines), "plain"))
-    with smtplib.SMTP(smtp_cfg["host"], smtp_cfg["port"]) as s:
-        s.starttls()
-        s.login(smtp_cfg["user"], smtp_cfg["password"])
-        s.send_message(msg)
-
-
 def extract_recipe_from_image(image_bytes: bytes, media_type: str, api_key: str) -> dict:
     """Send an image to Claude and return a parsed recipe dict."""
     client = _anthropic.Anthropic(api_key=api_key)
@@ -250,59 +220,6 @@ def extract_recipe_from_image(image_bytes: bytes, media_type: str, api_key: str)
 
 # ── Modal (must be module-level for @st.dialog to work) ──────────────────────
 
-@st.dialog("\U0001f4e7 Email shopping list", width="small")
-def email_list() -> None:
-    try:
-        smtp_cfg = {
-            "host":     st.secrets.get("SMTP_HOST", ""),
-            "port":     int(st.secrets.get("SMTP_PORT", 587)),
-            "user":     st.secrets.get("SMTP_USER", ""),
-            "password": st.secrets.get("SMTP_PASSWORD", ""),
-        }
-        default_email = st.secrets.get("DEFAULT_EMAIL", "")
-    except Exception:
-        smtp_cfg = {"host": "", "port": 587, "user": "", "password": ""}
-        default_email = ""
-    if not smtp_cfg["host"] or not smtp_cfg["user"]:
-        st.warning(
-            "Add SMTP settings to `.streamlit/secrets.toml` to enable email:\n\n"
-            "```toml\n"
-            "SMTP_HOST     = \"smtp.gmail.com\"\n"
-            "SMTP_PORT     = 587\n"
-            "SMTP_USER     = \"you@gmail.com\"\n"
-            "SMTP_PASSWORD = \"your-app-password\"\n"
-            "DEFAULT_EMAIL = \"you@gmail.com\"\n"
-            "```"
-        )
-        return
-    to_addr = st.text_input(
-        "Send to",
-        value=default_email,
-        placeholder="email@example.com",
-        key="email_to_addr",
-    )
-    to_buy_count = sum(1 for i in st.session_state.shopping_list if not i["checked"])
-    st.markdown(
-        f"<p style='color:#888;font-size:0.82rem;margin:0.1rem 0 0.7rem;'>"
-        f"{to_buy_count} item(s) to buy on the list.</p>",
-        unsafe_allow_html=True,
-    )
-    if st.button(
-        "Send \U0001f4e8",
-        key="email_send_btn",
-        use_container_width=True,
-        disabled=not to_addr.strip(),
-    ):
-        with st.spinner("Sending\u2026"):
-            try:
-                send_shopping_list_email(
-                    to_addr.strip(), st.session_state.shopping_list, smtp_cfg
-                )
-                st.success(f"\u2705 Sent to {to_addr}!")
-            except Exception as exc:
-                st.error(f"Failed: {exc}")
-
-
 @st.dialog("Recipe", width="large")
 def show_recipe(recipe: dict, matched: list, missing: list) -> None:
     pct = round(match_score(st.session_state.get("fridge", []), recipe["ingredients"]) * 100)
@@ -336,10 +253,7 @@ def show_recipe(recipe: dict, matched: list, missing: list) -> None:
             unsafe_allow_html=True,
         )
         # Scoped style for the add-to-list button
-        safe_modal_key = (
-            f"modal_shop_{recipe['name']}"
-            .replace(" ", "-").replace("'", "").replace(",", "").replace("(", "").replace(")", "")
-        )
+        safe_modal_key = _safe_key("modal_shop", recipe["name"])
         st.markdown(
             f"""
             <style>
@@ -410,10 +324,7 @@ def pick_ingredients(recipe: dict) -> None:
             selections[ing] = st.checkbox(ing, key=ck_key)
 
     chosen = [ing for ing, sel in selections.items() if sel]
-    safe_confirm_key = (
-        f"pick_confirm_{recipe['name']}"
-        .replace(" ", "-").replace("'", "").replace(",", "").replace("(", "").replace(")", "")
-    )
+    safe_confirm_key = _safe_key("pick_confirm", recipe["name"])
     st.markdown(
         f"""
         <style>
@@ -474,10 +385,7 @@ def recipe_card(recipe: dict, matched: list, missing: list, pct: int, key_prefix
     n_ing = len(recipe["ingredients"])
     servings = recipe.get("servings", "?")
 
-    safe_key = (
-        f"{key_prefix}_{recipe['name']}"
-        .replace(" ", "-").replace("'", "").replace(",", "").replace("(", "").replace(")", "")
-    )
+    safe_key = _safe_key(key_prefix, recipe["name"])
     if inject_css:
         st.markdown(
             f"""
@@ -1002,7 +910,7 @@ with tab_shop:
         list_text  = _format_list_text(st.session_state.shopping_list)
         mailto_url = "mailto:?subject=" + urllib.parse.quote("\U0001f6d2 Shopping List") + "&body=" + urllib.parse.quote(list_text)
         wa_url     = "https://wa.me/?text=" + urllib.parse.quote(list_text)
-        sh1, sh2, sh3, sh4 = st.columns(4)
+        sh1, sh2, sh3 = st.columns(3)
         with sh1:
             st.download_button(
                 "\u2b07\ufe0f Download .txt",
@@ -1022,9 +930,6 @@ with tab_shop:
                 f'<a href="{wa_url}" target="_blank" class="share-btn whatsapp-btn">💬 WhatsApp</a>',
                 unsafe_allow_html=True,
             )
-        with sh4:
-            if st.button("\U0001f4e7 SMTP email", key="shop_email_btn", use_container_width=True):
-                email_list()
 
         # Rows helper
         def _shop_rows(items: list[dict]) -> None:
